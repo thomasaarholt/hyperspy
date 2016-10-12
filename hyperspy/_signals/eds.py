@@ -19,6 +19,7 @@ import itertools
 import logging
 
 import numpy as np
+import math as math
 import warnings
 from matplotlib import pyplot as plt
 
@@ -231,6 +232,7 @@ class EDSSpectrum(Signal1D):
                 s.metadata.Acquisition_instrument.TEM.Detector.EDS.live_time\
                     *= factor
         return s
+
 
     def set_elements(self, elements):
         """Erase all elements and set them.
