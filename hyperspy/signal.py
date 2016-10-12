@@ -2330,13 +2330,26 @@ class BaseSignal(FancySlicing,
             shape2 = newSpectrum.shape
             s = np.zeros(newSpectrum.shape)
             s[:] = newSpectrum
-            newSpectrum = np.zeros((math.ceil(shape2[0]/binning_factor),
-                                    shape2[1], shape2[2]), dtype='float')
+            
+            new_shape = tuple()
+            for i, dimension_size in enumerate(shape):
+                if i == 0:
+                    new_shape += (math.ceil(dimension_size / binning_factor),)
+                else:
+                    new_shape += (dimension_size,)
+            newSpectrum = np.zeros(new_shape, dtype="float")
+
             if dimension_number != 0:
                 s = np.swapaxes(s, 0, dimension_number)
                 shape2 = s.shape
-                newSpectrum = np.zeros((math.ceil(shape2[0]/binning_factor),
-                                        shape2[1], shape2[2]), dtype='float')
+
+                new_shape = tuple()
+                for i, dimension_size in enumerate(shape):
+                    if i == 0:
+                        new_shape += (math.ceil(dimension_size / binning_factor),)
+                    else:
+                        new_shape += (dimension_size,)
+                newSpectrum = np.zeros(new_shape, dtype="float")
             for j in range(0, math.ceil(shape2[0]/binning_factor)):
                 bottomPos = (j*binning_factor)
                 topPos = ((1 + j) * binning_factor)
