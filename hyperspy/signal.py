@@ -2289,7 +2289,7 @@ class BaseSignal(FancySlicing,
 
         Return
         ------
-        numpy.array of the spectrum with new dimensions width/step.
+        Signal of the same type with the binned dimensions.
 
 
         Examples
@@ -2328,8 +2328,6 @@ class BaseSignal(FancySlicing,
         for dimension_number, binning_factor in enumerate(scale):
 
             shape2 = newSpectrum.shape
-            s = np.zeros(newSpectrum.shape)
-            s[:] = newSpectrum
             if dimension_number == 0:
                 new_shape = tuple()
                 for i, dimension_size in enumerate(shape2):
@@ -2340,6 +2338,8 @@ class BaseSignal(FancySlicing,
                 newSpectrum = np.zeros(new_shape, dtype="float")
 
             else:
+                s = np.zeros(shape2) # Is this necessary if the next line exists?
+                s[:] = newSpectrum # And is the [:] necessary?
                 s = np.swapaxes(s, 0, dimension_number)
                 shape2 = s.shape
 
