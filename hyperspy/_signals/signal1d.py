@@ -172,10 +172,8 @@ def find_peaks_ohaver(y, x=None, slope_thresh=0., amp_thresh=None,
                         c1 = coef[2]
                         c2 = coef[1]
                         c3 = coef[0]
-                        with np.errstate(invalid='ignore'):
-                            width = np.linalg.norm(stdev * 2.35703 /
-                                                   (np.sqrt(2) * np.sqrt(-1 *
-                                                                         c3)))
+                        width = np.linalg.norm(
+                            stdev * 2.35703 / (np.sqrt(2) * np.sqrt(-1 * c3)))
                         # if the peak is too narrow for least-squares
                         # technique to work  well, just use the max value
                         # of y in the sub-group of points near peak.
@@ -782,8 +780,7 @@ class Signal1D(BaseSignal, CommonSignal1D):
     def smooth_lowess(self,
                       smoothing_parameter=None,
                       number_of_iterations=None,
-                      show_progressbar=None,
-                      parallel=None):
+                      show_progressbar=None):
         """Lowess data smoothing in place.
         If `smoothing_parameter` or `number_of_iterations` are None the method
         is run in interactive mode.
@@ -798,8 +795,6 @@ class Signal1D(BaseSignal, CommonSignal1D):
         show_progressbar : None or bool
             If True, display a progress bar. If None the default is set in
             `preferences`.
-        parallel : {Bool, None, int}
-            Perform the operation parallely
         Raises
         ------
         SignalDimensionError if the signal dimension is not 1.
@@ -827,11 +822,9 @@ class Signal1D(BaseSignal, CommonSignal1D):
                      it=number_of_iterations,
                      is_sorted=True,
                      return_sorted=False,
-                     show_progressbar=show_progressbar,
-                     parallel=parallel)
+                     show_progressbar=show_progressbar)
 
-    def smooth_tv(self, smoothing_parameter=None, show_progressbar=None,
-                  parallel=None):
+    def smooth_tv(self, smoothing_parameter=None, show_progressbar=None):
         """Total variation data smoothing in place.
         Parameters
         ----------
@@ -841,8 +834,6 @@ class Signal1D(BaseSignal, CommonSignal1D):
         show_progressbar : None or bool
             If True, display a progress bar. If None the default is set in
             `preferences`.
-        parallel : {Bool, None, int}
-            Perform the operation parallely
         Raises
         ------
         SignalDimensionError if the signal dimension is not 1.
@@ -853,8 +844,7 @@ class Signal1D(BaseSignal, CommonSignal1D):
             smoother.edit_traits()
         else:
             self.map(_tv_denoise_1d, weight=smoothing_parameter,
-                     show_progressbar=show_progressbar,
-                     parallel=parallel)
+                     show_progressbar=show_progressbar)
 
     def filter_butterworth(self,
                            cutoff_frequency_ratio=None,

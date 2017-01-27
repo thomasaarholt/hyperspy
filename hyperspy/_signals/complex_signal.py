@@ -149,7 +149,7 @@ class ComplexSignal(BaseSignal):
         return sig
 
     def unwrapped_phase(self, wrap_around=False, seed=None,
-                        show_progressbar=None, parallel=None):
+                        show_progressbar=None):
         """Return the unwrapped phase as an appropriate HyperSpy signal.
 
         Parameters
@@ -166,8 +166,6 @@ class ComplexSignal(BaseSignal):
         show_progressbar : None or bool
             If True, display a progress bar. If None the default is set in
             `preferences`.
-        parallel : {Bool, None, int}
-            Perform the operation parallely
 
         Returns
         -------
@@ -186,8 +184,7 @@ class ComplexSignal(BaseSignal):
         from skimage.restoration import unwrap_phase
         phase = self.phase
         phase.map(unwrap_phase, wrap_around=wrap_around, seed=seed,
-                  show_progressbar=show_progressbar,
-                  parallel=parallel)
+                  show_progressbar=show_progressbar)
         phase.metadata.General.title = 'unwrapped {}'.format(
             phase.metadata.General.title)
         return phase  # Now unwrapped!

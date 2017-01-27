@@ -30,7 +30,7 @@ in the following sections of this chapter.
     │   │   ├── beam_current (nA)
     │   │   ├── beam_energy (keV)
     │   │   ├── convergence_angle (mrad)
-    │   │   ├── magnification
+    │       ├── magnification
     │   │   ├── microscope
     │   │   └── tilt_stage (º)
     │   └── TEM
@@ -48,10 +48,6 @@ in the following sections of this chapter.
     │       │       ├── exposure (s)
     │       │       ├── frame_number
     │       │       └── spectrometer
-    │       ├── Biprism
-    │       │   ├── azimuth_angle (º)
-    │       │   ├── position
-    │       │   └── voltage (V)
     │       ├── acquisition_mode
     │       ├── beam_current (nA)
     │       ├── beam_energy (keV)
@@ -70,7 +66,6 @@ in the following sections of this chapter.
     │   ├── time_zone
     │   └── title
     ├── Sample
-    │   ├── credits
     │   ├── description
     │   ├── elements
     │   ├── thickness
@@ -269,6 +264,7 @@ spectrometer
 
     The spectrometer model, e.g. Gatan Enfinium ER (Model 977).
 
+
 EDS
 ^^^
 
@@ -306,33 +302,8 @@ live_time
     The time spent to record the spectrum in second, compensated for the
     dead time of the detector.
 
-Biprism
--------
-
-This node stores parameters of biprism used in off-axis electron holography
-
-azimuth_angle (º)
-    type: Float
-
-    Rotation angle of the biprism in degree
-
-position
-    type: Str
-
-    Position of the biprism in microscope column, e.g. Selected area aperture plane
-
-voltage
-    type: Float
-
-    Voltage of electrostatic biprism in volts
-
 Sample
 ======
-
-credits
-    type: Str
-
-    Acknowledgment of sample supplier, e.g. Prepared by Putin, Vladimir V.
 
 description
     type: Str

@@ -24,7 +24,6 @@ HyperSpy User Guide (DRAFT)
     eels.rst
     eds.rst
     dielectric_function.rst
-    electron_holography.rst
     io.rst
     events.rst
     metadata_structure.rst

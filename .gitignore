@@ -32,7 +32,6 @@ doc/examples
 doc/gh-pages
 doc/log.txt
 *Thumbs.db
-*.DS_Store
 .ropeproject/*
 .idea/*
 *.pyproj

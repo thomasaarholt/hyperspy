@@ -100,14 +100,6 @@ hyperspy.tests.signal.test_folding module
     :undoc-members:
     :show-inheritance:
 
-hyperspy.tests.signal.test_hologram_image module
-------------------------------------------------
-
-.. automodule:: hyperspy.tests.signal.test_hologram_image
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 hyperspy.tests.signal.test_image module
 ---------------------------------------
 
