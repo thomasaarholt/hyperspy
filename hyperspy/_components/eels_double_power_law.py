@@ -92,7 +92,7 @@ class DoublePowerLaw(Expression):
 
         self.isbackground = True
         self.convolved = False
-
+        
     def function_nd(self, axis):
         """%s
 

@@ -134,6 +134,7 @@ class Polynomial(Expression):
                         para.map['is_set'][:] = True
             self.fetch_stored_values()
             return True
+<<<<<<< HEAD
 
 
 def convert_to_polynomial(poly_dict):
@@ -156,3 +157,11 @@ def convert_to_polynomial(poly_dict):
         poly2_dict['parameters'].append(param_dict)
 
     return poly2_dict
+=======
+    
+    @property
+    def constant_term(self):
+        "Get value of constant term of component"
+        # First get currently constant parameters
+        return self.coefficients.value[-1]
+>>>>>>> Linearity attribute to parameters

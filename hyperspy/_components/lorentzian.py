@@ -125,6 +125,7 @@ class Lorentzian(Expression):
         self.isbackground = False
         self.convolved = True
 
+<<<<<<< HEAD
     def estimate_parameters(self, signal, x1, x2, only_current=False):
         """Estimate the Lorentzian by calculating the median (centre) and half 
         the interquartile range (gamma).
@@ -165,6 +166,26 @@ class Lorentzian(Expression):
         >>> s.axes_manager[-1].offset = -10
         >>> s.axes_manager[-1].scale = 0.01
         >>> g.estimate_parameters(s, -10, 10, False)
+=======
+        # Gradients
+        self.A.grad = self.grad_A
+        self.gamma.grad = self.grad_gamma
+        self.centre.grad = self.grad_centre
+
+        # Linearity
+        self.A._is_linear = True
+
+    def function(self, x):
+        """
+        """
+        A = self.A.value
+        gamma = self.gamma.value
+        centre = self.centre.value
+
+        return A / np.pi * (gamma / ((x - centre) ** 2 + gamma ** 2))
+
+    def grad_A(self, x):
+>>>>>>> Linearity attribute to parameters
         """
 
         super(Lorentzian, self)._estimate_parameters(signal)

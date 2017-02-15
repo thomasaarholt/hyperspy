@@ -181,6 +181,7 @@ class Parameter(t.HasTraits):
                            'self': ('id', None),
                            }
         self._slicing_whitelist = {'map': 'inav'}
+        self._is_linear = False
 
     def _load_dictionary(self, dictionary):
         """Load data from dictionary.
@@ -1224,3 +1225,28 @@ class Component(t.HasTraits):
         else:
             display_pretty(current_component_values(
                 self, only_free=only_free))
+    @property
+    def is_linear(self):
+        "Loops through the components free parameters, checks that they are linear"
+        linear = True
+        for para in self.free_parameters:
+            if not para._is_linear:
+                linear = False
+        return linear
+
+    @property
+    def constant_term(self):
+        "Get value of the constant term of the component. Returns 0 for most components."
+        return 0
+
+    def _check_only_one_linear_parameter(self):
+        """
+        Linear fitters can only work with one linear parameter per component.
+        Checks that this is the case for a given component.
+        """
+        n_free = 0
+        for para in self.free_parameters:
+            if para._is_linear:
+                n_free += 1
+        if n_free > 1:
+            raise AttributeError("Component " + str(self) + " has more than one linear parameter.")
