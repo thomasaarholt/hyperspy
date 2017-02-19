@@ -769,6 +769,7 @@ class Component(t.HasTraits):
         self._slicing_whitelist = {'_active_array': 'inav'}
         self._slicing_order = ('active', 'active_is_multidimensional',
                                '_active_array',)
+        self._constant_parameters = []
 
     _name = ''
     _active_is_multidimensional = False
@@ -1238,6 +1239,16 @@ class Component(t.HasTraits):
     def constant_term(self):
         "Get value of the constant term of the component. Returns 0 for most components."
         return 0
+    
+    @property
+    def constant_parameters(self):
+        "List all parameters which have a non-signal-axis-dependent parameter"
+        return self._constant_parameters
+
+    @property
+    def _free_offset_parameter(self):
+        "Attribute containing any free parameter that acts as an offset"
+        return None
 
     def _check_only_one_linear_parameter(self):
         """
@@ -1249,4 +1260,9 @@ class Component(t.HasTraits):
             if para._is_linear:
                 n_free += 1
         if n_free > 1:
+<<<<<<< HEAD
             raise AttributeError("Component " + str(self) + " has more than one linear parameter.")
+=======
+            raise AttributeError("Component " + str(self) +
+                                 " has more than one linear component.")
+>>>>>>> Linear model fitting functions

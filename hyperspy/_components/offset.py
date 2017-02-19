@@ -57,6 +57,8 @@ class Offset(Component):
         # Linearity
         self.offset._is_linear = True
 
+        self._constant_parameters = [self.offset]
+
     def function(self, x):
         return self._function(x, self.offset.value)
 
@@ -111,6 +113,7 @@ class Offset(Component):
             self.fetch_stored_values()
             return True
 <<<<<<< HEAD
+<<<<<<< HEAD
 
     def function_nd(self, axis):
         """%s
@@ -127,12 +130,26 @@ class Offset(Component):
     function_nd.__doc__ %= FUNCTION_ND_DOCSTRING
 =======
         
+=======
+
+>>>>>>> Linear model fitting functions
     @property
     def constant_term(self):
-        "Get value of constant term of non-free component"
+        "Get value of constant term of component"
         # First get currently constant parameters
         if self.offset.free:
             return 0
         else:
             return self.offset.value
+<<<<<<< HEAD
 >>>>>>> Linearity attribute to parameters
+=======
+
+    @property
+    def _free_offset_parameter(self):
+        "Attribute containing any free parameter that acts as an offset"
+        if self.offset.free:
+            return self.offset
+        else:
+            return None
+>>>>>>> Linear model fitting functions
