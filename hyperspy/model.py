@@ -31,6 +31,8 @@ from scipy.optimize import (leastsq, least_squares,
 from scipy.linalg import svd
 from contextlib import contextmanager
 
+from sklearn.linear_model import LinearRegression
+
 from hyperspy.external.progressbar import progressbar
 from hyperspy.defaults_parser import preferences
 from hyperspy.external.mpfit.mpfit import mpfit
@@ -1289,6 +1291,99 @@ class BaseModel(list):
                 'Deleting the temporary file %s pixels' % (
                     autosave_fn + 'npz'))
             os.remove(autosave_fn + '.npz')
+
+    def check_and_set_linear_parameters_not_zero(self):
+        self.p0 = [value if value != 0 else 1 for value in self.p0]
+
+    def get_nonlinear_components(self):
+        """Loops through active components checking all parameters are linear"""
+        nonlinear = []
+
+        for comp in self:
+            if comp.active:
+                for parameter in comp.parameters:
+                    if parameter.free:
+                        if not parameter.is_linear:
+                            nonlinear.append(comp)
+                            break
+        return nonlinear
+
+    def get_signal_for_linear_fitting(self):
+        """
+        Gets the current signal minus fixed model components, for linear fitting
+        -This could use the previous function to reduce typing-
+        """
+        self._set_p0()
+        deactivated_components = []
+        for component in self:
+            if component.active:
+                if not component.free_parameters:
+                    for parameter in component.parameters:
+                        if parameter.twin:
+                            deactivated_components.append(component)
+                            break
+                else:
+                    deactivated_components.append(component)
+        for comp in deactivated_components:
+            comp.active = False
+
+        fixed_model = self._model_function(self.p0)
+
+        for comp in deactivated_components:
+            comp.active = True
+        signal = self.signal()[np.where(self.channel_switches)]
+        signal_to_fit_to = signal - fixed_model
+        if self.signal.metadata.Signal.binned is True:
+            signal_to_fit_to = signal_to_fit_to / self.signal.axes_manager[-1].scale
+        return signal_to_fit_to
+
+    def megafit(self):
+        """
+        Multifit but uses the whole spectrum image datacube in one go.
+        Currently only supports boundless fitting using linear regression.
+
+        Assumes that non-linear features (background, etc) have already been fitted and fixed.
+        """
+        # Creates dataset to fit to, by looping through the model and subtracting any fixed and non-twinned components from the original signal
+
+        nonlinear = self.get_nonlinear_components()
+        if nonlinear:
+            raise AttributeError(not_linear_error + str(nonlinear))
+
+        self._set_p0()
+        self.check_and_set_linear_parameters_not_zero()
+        current_indices = self.axes_manager.indices # Reference for current pixel
+
+        fitdata = np.array([self.get_signal_for_linear_fitting() for index in self.axes_manager])
+        # May be faster to generate fitdata by getting values from parameter.map, and doing a linear combination of
+        # `component.function()`s.
+
+        signal_axis = self.axis.axis[np.where(self.channel_switches)]
+        self.axes_manager.indices = current_indices
+        components_from_current_pixel = np.array([component.function(signal_axis)
+                                                  for component in self if len(component.free_parameters) > 0])
+        p0_from_current_pixel = self.p0
+
+        RegressionModel = LinearRegression(fit_intercept=False)
+        result = RegressionModel.fit(components_from_current_pixel.T, fitdata.T)
+
+        coefficients = result.coef_
+        fitted_p0 = p0_from_current_pixel*coefficients
+        shape_for_component_values = self.axes_manager._navigation_shape_in_array + (len(self.p0),)
+        fitted_p0 = fitted_p0.reshape(shape_for_component_values)
+
+        p0_parameters = [] # List of parameters to set values of
+        for comp in self:
+            if comp.active:
+                for para in comp.parameters:
+                    if para.free:
+                        p0_parameters.append(para)
+
+        for para, new_values in zip(p0_parameters, fitted_p0.T):
+            para.map["values"] = new_values.T # Faster way of setting parameters than looping through axes_manager
+        self.fit_output = result
+        self.residues = result.residues_.reshape(self.axes_manager._navigation_shape_in_array)
+
 
     def save_parameters2file(self, filename):
         """Save the parameters array in binary format.
