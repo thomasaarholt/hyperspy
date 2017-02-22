@@ -31,7 +31,7 @@ from scipy.optimize import (leastsq, least_squares,
 from scipy.linalg import svd
 from contextlib import contextmanager
 
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression, Lasso
 
 from hyperspy.external.progressbar import progressbar
 from hyperspy.defaults_parser import preferences
@@ -1337,7 +1337,7 @@ class BaseModel(list):
             signal_to_fit_to = signal_to_fit_to / self.signal.axes_manager[-1].scale
         return signal_to_fit_to
 
-    def megafit(self):
+    def megafit(self, fitter="linear", **kwargs):
         """
         Multifit but uses the whole spectrum image datacube in one go.
         Currently only supports boundless fitting using linear regression.
@@ -1363,9 +1363,14 @@ class BaseModel(list):
         components_from_current_pixel = np.array([component.function(signal_axis)
                                                   for component in self if len(component.free_parameters) > 0])
         p0_from_current_pixel = self.p0
-
-        RegressionModel = LinearRegression(fit_intercept=False)
+        from time import time
+        t = time()
+        if fitter == "linear":
+            RegressionModel = LinearRegression(fit_intercept=False, **kwargs)
+        elif fitter == "lasso":
+            RegressionModel = Lasso(fit_intercept=False, precompute=True, positive=True, **kwargs)
         result = RegressionModel.fit(components_from_current_pixel.T, fitdata.T)
+        print("Model took", time() - t, "seconds!")
 
         coefficients = result.coef_
         fitted_p0 = p0_from_current_pixel*coefficients
@@ -1382,8 +1387,8 @@ class BaseModel(list):
         for para, new_values in zip(p0_parameters, fitted_p0.T):
             para.map["values"] = new_values.T # Faster way of setting parameters than looping through axes_manager
         self.fit_output = result
-        self.residues = result.residues_.reshape(self.axes_manager._navigation_shape_in_array)
-
+        #self.residues = result.residues_.reshape(self.axes_manager._navigation_shape_in_array) \
+         #   if result.residues_.any() else None
 
     def save_parameters2file(self, filename):
         """Save the parameters array in binary format.
