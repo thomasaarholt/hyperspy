@@ -164,6 +164,7 @@ compiler = distutils.ccompiler.new_compiler()
 assert isinstance(compiler, distutils.ccompiler.CCompiler)
 distutils.sysconfig.customize_compiler(compiler)
 try:
+    print(setup_path)
     compiler.compile([os.path.join(setup_path,
                                    'hyperspy/misc/etc/test_compilers.c')])
 except (CompileError, DistutilsPlatformError):
