@@ -60,10 +60,10 @@ supported_filetypes = {
     "blo": ("blockfile", "Blockfile", True, True, True),
     "dens": ("dens", "DENS heater log", True, False, False),
     "emd": ("emd", "Berkeley Labs", True, True, True),
-    "csv": ("CSV", "CSV", True, False, False),
+    "csv": ("protochips", "Protochips", True, False, False),
     "spd": ("edax", "EDAX", True, False, True),
     "spc": ("edax", "EDAX", True, False, True),
-    "nc": ("NC", "NC", True, False, False),
+    "nc": ("NC", "NetCDF", False, False, False),
     "hspy": ("hspy", "Hyperspy HDF5", True, True, True),
     "hdf5": ("hspy", "Hyperspy HDF5", True, True, True),
     "png": ("image", "Image", True, True, True),
@@ -307,25 +307,28 @@ def load_single_file(filename,
 
     """
     extension = os.path.splitext(filename)[1][1:]
-    print(extension.lower())
+
     if extension.lower() in supported_filetypes.keys():
         file_reader_name = supported_filetypes[extension.lower()][0]
         reader = get_file_reader(file_reader_name)
     else:
         # Try to load it with the python imaging library
         try:
-            from hyperspy.io_plugins import image
-            reader = image
+            import hyperspy.io_plugins.image as reader
             return load_with_reader(filename, reader,
                                     signal_type=signal_type, **kwds)
         except:
             raise IOError('If the file format is supported'
                           ' please report this error')
-    
+
     return load_with_reader(filename=filename,
                             reader=reader,
                             signal_type=signal_type,
                             **kwds)
+
+def missing_file_reader(reader_name):
+    raise AttributeError("The reader for {0} is not installed. \
+    Please check www.hyperspy.org".format(reader_name))
 
 def get_file_reader(reader_name):
     if reader_name == "bcf":
@@ -523,11 +526,9 @@ def save(filename, signal, overwrite=None, **kwds):
         extension = "hspy"
         filename = filename + '.' + extension
     writer = None
-    for plugin in supported_filetypes:
-        if extension.lower() == plugin:
-            writer = get_file_reader(supported_filetypes[plugin][0])
-            break
-
+    if extension.lower() in supported_filetypes.keys():
+        if supported_filetypes[extension.lower()]:
+            writer = get_file_reader(supported_filetypes[extension.lower()][0])
     if writer is None:
         raise ValueError(
             ('.%s does not correspond to any supported format. Supported ' +
