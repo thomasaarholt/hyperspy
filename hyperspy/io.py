@@ -29,7 +29,6 @@ from hyperspy.misc.io.tools import ensure_directory
 from hyperspy.misc.io.tools import overwrite as overwrite_method
 from hyperspy.misc.utils import (strlist2enumeration, find_subclasses)
 from hyperspy.misc.utils import stack as stack_method
-from hyperspy.io_plugins import io_plugins, default_write_ext
 from hyperspy.exceptions import VisibleDeprecationWarning
 from hyperspy.defaults_parser import preferences
 from hyperspy.ui_registry import get_gui
@@ -43,45 +42,51 @@ f_error_fmt = (
     "\t\t%d signals\n"
     "\t\tPath: %s")
 
-
+# Keys are extensions, values are reader type
 supported_filetypes = {
-    "msa":"msa",
-    'ems':"msa",
-    'mas':"msa",
-    'emsa':"msa",
-    "dm3":"digital_micrograph",
-    "dm4":"digital_micrograph",
-    'ser':"fei",
-    'emi':"fei",
-    "mrc":"mrc",
-    "ali":"mrc",
-    "rpl":"ripple",
-    "tif":"tiff",
-    "unf":"semper_unf",
-    "blo":"blockfile",
-    "dens":"dens",
-    "emd":"emd",
-    "csv":"CSV",
-    "spd":"edax",
-    "spc":"edax",
-    "nc":"NC",
-    "hspy":"hspy",
-    "png":"image",
-    "bmp":"image",
-    "dib":"image",
-    "gif":"image",
-    "jpeg":"image",
-    "jpe":"image",
-    "jpg":"image",
-    "msp":"image",
-    "pcx":"image",
-    "ppm":"image",
-    "pbm":"image",
-    "pgm":"image",
-    "xbm":"image",
-    "spi":"image",
-    "bcf":"bcf"
+    "msa": ("msa", "MSA", True, True, False),
+    'ems': ("msa", "MSA", True, True, False),
+    'mas': ("msa", "MSA", True, True, False),
+    'emsa': ("msa", "MSA", True, True, False),
+    "dm3": ("digital_micrograph", "Digital Micrograph", True, False, True),
+    "dm4": ("digital_micrograph", "Digital Micrograph", True, False, True),
+    'ser': ("fei", "FEI", True, False, True),
+    'emi': ("fei", "FEI", True, False, True),
+    "mrc": ("mrc", "MRC", True, False, True),
+    "ali": ("mrc", "MRC", True, False, True),
+    "rpl": ("ripple", "Ripple", True, True, True),
+    "tif": ("tiff", "Tiff", True, True, True),
+    "unf": ("semper_unf", "SEMPER", True, True, True),
+    "blo": ("blockfile", "Blockfile", True, True, True),
+    "dens": ("dens", "DENS heater log", True, False, False),
+    "emd": ("emd", "Berkeley Labs", True, True, True),
+    "csv": ("CSV", "CSV", True, False, False),
+    "spd": ("edax", "EDAX", True, False, True),
+    "spc": ("edax", "EDAX", True, False, True),
+    "nc": ("NC", "NC", True, False, False),
+    "hspy": ("hspy", "Hyperspy HDF5", True, True, True),
+    "hdf5": ("hspy", "Hyperspy HDF5", True, True, True),
+    "png": ("image", "Image", True, True, True),
+    "bmp": ("image", "Image", True, True, True),
+    "dib": ("image", "Image", True, True, True),
+    "gif": ("image", "Image", True, True, True),
+    "jpeg": ("image", "Image", True, True, True),
+    "jpe": ("image", "Image", True, True, True),
+    "jpg": ("image", "Image", True, True, True),
+    "msp": ("image", "Image", True, True, True),
+    "pcx": ("image", "Image", True, True, True),
+    "ppm": ("image", "Image", True, True, True),
+    "pbm": ("image", "Image", True, True, True),
+    "pgm": ("image", "Image", True, True, True),
+    "xbm": ("image", "Image", True, True, True),
+    "spi": ("image", "Image", True, True, True),
+    "bcf": ("bcf", "Bruker", True, False, True),
 }
+
+default_write_ext = set()
+for plugin_extension in supported_filetypes:
+    if supported_filetypes[plugin_extension][3]:
+        default_write_ext.add(plugin_extension)
 
 def load(filenames=None,
          signal_type=None,
@@ -302,10 +307,10 @@ def load_single_file(filename,
 
     """
     extension = os.path.splitext(filename)[1][1:]
-
+    print(extension.lower())
     if extension.lower() in supported_filetypes.keys():
-        file_reader = supported_filetypes[extension.lower()]
-    
+        file_reader_name = supported_filetypes[extension.lower()][0]
+        reader = get_file_reader(file_reader_name)
     else:
         # Try to load it with the python imaging library
         try:
@@ -317,7 +322,6 @@ def load_single_file(filename,
             raise IOError('If the file format is supported'
                           ' please report this error')
     
-    reader = io_plugins[i]
     return load_with_reader(filename=filename,
                             reader=reader,
                             signal_type=signal_type,
@@ -519,9 +523,9 @@ def save(filename, signal, overwrite=None, **kwds):
         extension = "hspy"
         filename = filename + '.' + extension
     writer = None
-    for plugin in io_plugins:
-        if extension.lower() in plugin.file_extensions:
-            writer = plugin
+    for plugin in supported_filetypes:
+        if extension.lower() == plugin:
+            writer = get_file_reader(supported_filetypes[plugin][0])
             break
 
     if writer is None:
