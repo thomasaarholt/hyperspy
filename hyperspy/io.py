@@ -44,6 +44,45 @@ f_error_fmt = (
     "\t\tPath: %s")
 
 
+supported_filetypes = {
+    "msa":"msa",
+    'ems':"msa",
+    'mas':"msa",
+    'emsa':"msa",
+    "dm3":"digital_micrograph",
+    "dm4":"digital_micrograph",
+    'ser':"fei",
+    'emi':"fei",
+    "mrc":"mrc",
+    "ali":"mrc",
+    "rpl":"ripple",
+    "tif":"tiff",
+    "unf":"semper_unf",
+    "blo":"blockfile",
+    "dens":"dens",
+    "emd":"emd",
+    "csv":"CSV",
+    "spd":"edax",
+    "spc":"edax",
+    "nc":"NC",
+    "hspy":"hspy",
+    "png":"image",
+    "bmp":"image",
+    "dib":"image",
+    "gif":"image",
+    "jpeg":"image",
+    "jpe":"image",
+    "jpg":"image",
+    "msp":"image",
+    "pcx":"image",
+    "ppm":"image",
+    "pbm":"image",
+    "pgm":"image",
+    "xbm":"image",
+    "spi":"image",
+    "bcf":"bcf"
+}
+
 def load(filenames=None,
          signal_type=None,
          stack=False,
@@ -264,11 +303,10 @@ def load_single_file(filename,
     """
     extension = os.path.splitext(filename)[1][1:]
 
-    i = 0
-    while extension.lower() not in io_plugins[i].file_extensions and \
-            i < len(io_plugins) - 1:
-        i += 1
-    if i == len(io_plugins):
+    if extension.lower() in supported_filetypes.keys():
+        file_reader = supported_filetypes[extension.lower()]
+    
+    else:
         # Try to load it with the python imaging library
         try:
             from hyperspy.io_plugins import image
@@ -278,13 +316,45 @@ def load_single_file(filename,
         except:
             raise IOError('If the file format is supported'
                           ' please report this error')
-    else:
-        reader = io_plugins[i]
-        return load_with_reader(filename=filename,
-                                reader=reader,
-                                signal_type=signal_type,
-                                **kwds)
+    
+    reader = io_plugins[i]
+    return load_with_reader(filename=filename,
+                            reader=reader,
+                            signal_type=signal_type,
+                            **kwds)
 
+def get_file_reader(reader_name):
+    if reader_name == "bcf":
+        import hyperspy.io_plugins.bcf as reader
+    elif  reader_name == "digital_micrograph":
+        import hyperspy.io_plugins.digital_micrograph as reader
+    elif  reader_name == "fei":
+        import hyperspy.io_plugins.fei as reader
+    elif  reader_name == "mrc":
+        import hyperspy.io_plugins.mrc as reader
+    elif  reader_name == "ripple":
+        import hyperspy.io_plugins.ripple as reader
+    elif  reader_name == "ripple":
+        import hyperspy.io_plugins.semper_unf as reader
+    elif  reader_name == "semper_unf":
+        import hyperspy.io_plugins.blockfile as reader
+    elif  reader_name == "blockfile":
+        import hyperspy.io_plugins.dens as reader
+    elif  reader_name == "dens":
+        import hyperspy.io_plugins.bcf as reader
+    elif  reader_name == "emd":
+        import hyperspy.io_plugins.emd as reader
+    elif  reader_name == "edax":
+        import hyperspy.io_plugins.edax as reader
+    elif  reader_name == "hspy":
+        import hyperspy.io_plugins.hspy as reader
+    elif  reader_name == "image":
+        import hyperspy.io_plugins.image as reader
+    elif  reader_name == "image":
+        import hyperspy.io_plugins.bcf as reader
+    else:
+        raise ValueError("File extension error")
+    return reader
 
 def load_with_reader(filename,
                      reader,
