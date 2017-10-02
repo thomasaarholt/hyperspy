@@ -809,7 +809,12 @@ class EELSSpectrum_mixin:
             show_progressbar = preferences.General.show_progressbar
         self._check_signal_dimension_equals_one()
         psf_size = psf.axes_manager.signal_axes[0].size
-        kernel = psf()
+        signal_shape = self.axes_manager.navigation_shape
+        kernel_shape = psf.axes_manager.navigation_shape
+        if kernel_shape != signal_shape:
+            kernel = signal_shape[0]*[signal_shape[1]*[psf()]]
+        else:
+            kernel = psf()
         imax = kernel.argmax()
         maxval = self.axes_manager.navigation_size
         show_progressbar = show_progressbar and (maxval > 0)
