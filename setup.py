@@ -107,7 +107,7 @@ for leftover in raw_extensions:
             bin_ext = '.cpython-*.pyd'
         else:
             bin_ext = '.cpython-*.so'
-        cleanup_list.append(str(setup_path / source.parent / source.stem) + bin_ext])
+        cleanup_list.append(str(setup_path / source.parent / source.stem) + bin_ext)
 
 
 def count_c_extensions(extensions):
@@ -224,7 +224,7 @@ if git_dir.exists() and (not hook_ignorer.exists()):
                 hook_lines.append(
                     'rm ' + ' '.join(['"%s"' % i for i in cleanup_list]) + '\n')
                 hook_lines.append(recythonize_str)
-            with post_checkout_hook_file.open('w') as pchook:
+            with post_checkout_hook_file.open(mode='w') as pchook:
                 pchook.writelines(hook_lines)
 
 
