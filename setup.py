@@ -164,7 +164,7 @@ compiler = distutils.ccompiler.new_compiler()
 assert isinstance(compiler, distutils.ccompiler.CCompiler)
 distutils.sysconfig.customize_compiler(compiler)
 try:
-    compiler.compile(setup_path / 'hyperspy' / 'misc' / 'etc' / 'test_compilers.c')
+    compiler.compile([str(setup_path / 'hyperspy' / 'misc' / 'etc' / 'test_compilers.c')])
 except (CompileError, DistutilsPlatformError):
     warnings.warn("""WARNING: C compiler can't be found.
 Only slow pure python alternative functions will be available.
