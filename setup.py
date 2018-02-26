@@ -179,16 +179,15 @@ Installation will continue in 5 sec...""")
 
 
 # HOOKS ######
-post_checkout_hook_file = os.path.join(setup_path, '.git', 'hooks',
-                                       'post-checkout')
-git_dir = os.path.join(setup_path, '.git')
-hook_ignorer = os.path.join(setup_path, '.hook_ignore')
+post_checkout_hook_file = setup_path / '.git' / 'hooks' / 'post-checkout'
+git_dir = setup_path / '.git'
+hook_ignorer =setup_path / '.hook_ignore'
 
 
 def find_post_checkout_cleanup_line():
     """find the line index in the git post-checkout hooks
     'rm extension1 extension2 ...'"""
-    with open(post_checkout_hook_file, 'r') as pchook:
+    with post_checkout_hook_file.open(mode='r') as pchook:
         hook_lines = pchook.readlines()
         for i in range(1, len(hook_lines), 1):
             if re.search('#cleanup_cythonized_and_compiled:',
@@ -198,21 +197,21 @@ def find_post_checkout_cleanup_line():
 
 # generate some git hook to clean up and re-build_ext --inplace
 # after changing branches:
-if os.path.exists(git_dir) and (not os.path.exists(hook_ignorer)):
+if git_dir.exists() and (not hook_ignorer.exists()):
     exec_str = sys.executable
     recythonize_str = '"{}" "{}" clean --all build_ext --inplace\n'.format(
         exec_str, os.path.join(setup_path, 'setup.py'))
     if (not os.path.exists(post_checkout_hook_file)):
-        with open(post_checkout_hook_file, 'w') as pchook:
+        with post_checkout_hook_file.open(mode='w') as pchook:
             pchook.write('#!/bin/sh\n')
             pchook.write('#cleanup_cythonized_and_compiled:\n')
             pchook.write(
                 'rm ' + ' '.join(['"%s"' % i for i in cleanup_list]) + '\n')
             pchook.write(recythonize_str)
         hook_mode = 0o777  # make it executable
-        os.chmod(post_checkout_hook_file, hook_mode)
+        post_checkout_hook_file.chmod(hook_mode)
     else:
-        with open(post_checkout_hook_file, 'r') as pchook:
+        with post_checkout_hook_file.open(mode='r') as pchook:
             hook_lines = pchook.readlines()
         if re.search(r'#!/bin/.*?sh', hook_lines[0]) is not None:
             line_n = find_post_checkout_cleanup_line()
@@ -225,7 +224,7 @@ if os.path.exists(git_dir) and (not os.path.exists(hook_ignorer)):
                 hook_lines.append(
                     'rm ' + ' '.join(['"%s"' % i for i in cleanup_list]) + '\n')
                 hook_lines.append(recythonize_str)
-            with open(post_checkout_hook_file, 'w') as pchook:
+            with post_checkout_hook_file.open('w') as pchook:
                 pchook.writelines(hook_lines)
 
 
