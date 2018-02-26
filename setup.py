@@ -99,14 +99,15 @@ raw_extensions = [Extension("hyperspy.io_plugins.unbcf_fast",
 
 cleanup_list = []
 for leftover in raw_extensions:
-    path, ext = os.path.splitext(leftover.sources[0])
-    if ext in ('.pyx', '.py'):
-        cleanup_list.append(''.join([os.path.join(setup_path, path), '.c*']))
+    source = Path(leftover.sources[0]).resolve()
+    
+    if source.suffix in ('.pyx', '.py'):
+        cleanup_list.append(str(setup_path / source.parent / source.stem) + '.c*')
         if os.name == 'nt':
             bin_ext = '.cpython-*.pyd'
         else:
             bin_ext = '.cpython-*.so'
-        cleanup_list.append(''.join([os.path.join(setup_path, path), bin_ext]))
+        cleanup_list.append(str(setup_path / source.parent / source.stem) + bin_ext])
 
 
 def count_c_extensions(extensions):
