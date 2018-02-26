@@ -102,7 +102,7 @@ for leftover in raw_extensions:
     source = Path(leftover.sources[0]).resolve()
     
     if source.suffix in ('.pyx', '.py'):
-        cleanup_list.append(str(setup_path / source.parent / source.stem) + '.c*')
+        cleanup_list.append(str(setup_path / source.parent / source.stem) + '.c')
         if os.name == 'nt':
             bin_ext = '.cpython-*.pyd'
         else:
