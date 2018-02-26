@@ -81,7 +81,7 @@ if 'readthedocs.org' in sys.executable:
 
 
 def update_version(version):
-    release_path = Path("hyperspy/Release.py")
+    release_path = Path("hyperspy/Release.py").resolve()
     lines = []
     with release_path.open(mode='r') as f:
         for line in f:
