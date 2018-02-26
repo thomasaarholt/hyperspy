@@ -33,6 +33,7 @@ from setuptools import setup, Extension, Command
 import warnings
 
 import os
+from pathlib import Path
 import subprocess
 import itertools
 import re
@@ -42,7 +43,7 @@ import distutils.sysconfig
 import distutils.ccompiler
 from distutils.errors import CompileError, DistutilsPlatformError
 
-setup_path = os.path.dirname(__file__)
+setup_path = Path(os.path.dirname(__file__))
 
 import hyperspy.Release as Release
 
@@ -80,14 +81,14 @@ if 'readthedocs.org' in sys.executable:
 
 
 def update_version(version):
-    release_path = "hyperspy/Release.py"
+    release_path = Path("hyperspy/Release.py")
     lines = []
-    with open(release_path, "r") as f:
+    with release_path.open(mode='r') as f:
         for line in f:
             if line.startswith("version = "):
                 line = "version = \"%s\"\n" % version
             lines.append(line)
-    with open(release_path, "w") as f:
+    with release_path.open(mode='w') as f:
         f.writelines(lines)
 
 
