@@ -164,7 +164,7 @@ compiler = distutils.ccompiler.new_compiler()
 assert isinstance(compiler, distutils.ccompiler.CCompiler)
 distutils.sysconfig.customize_compiler(compiler)
 try:
-    compiler.compile([str(setup_path / 'hyperspy' / 'misc' / 'etc' / 'test_compilers.c')])
+    compiler.compile([str(Path('hyperspy') / 'misc' / 'etc' / 'test_compilers.c')])
 except (CompileError, DistutilsPlatformError):
     warnings.warn("""WARNING: C compiler can't be found.
 Only slow pure python alternative functions will be available.
@@ -226,7 +226,6 @@ if git_dir.exists() and (not hook_ignorer.exists()):
                 hook_lines.append(recythonize_str)
             with post_checkout_hook_file.open(mode='w') as pchook:
                 pchook.writelines(hook_lines)
-
 
 class Recythonize(Command):
 
