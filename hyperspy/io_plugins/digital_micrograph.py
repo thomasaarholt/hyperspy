@@ -915,7 +915,7 @@ class ImageObject(object):
                 "Convergence semi-angle (mrad)": (
                     "Acquisition_instrument.TEM.convergence_angle",
                     None),
-                "{}.EELS.Acquisition.Integration time (s)".format(tags_path): (
+                "{}.EELS.Acquisition.Exposure_s".format(tags_path): (
                     "Acquisition_instrument.TEM.Detector.EELS.%s" % mapped_attribute,
                     None),
                 "{}.EELS.Acquisition.Number_of_frames".format(tags_path): (
