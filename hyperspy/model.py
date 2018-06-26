@@ -894,7 +894,7 @@ class BaseModel(list):
             if comp.active:
                 for parameter in comp.parameters:
                     if parameter.free:
-                        if not parameter.is_linear:
+                        if not parameter._is_linear:
                             return False
         return True
 
