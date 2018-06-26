@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
+<<<<<<< HEAD
 # Copyright 2007-2020 The HyperSpy developers
+=======
+# Copyright 2007-2016 The HyperSpy developers
+>>>>>>> Squash: Linear Model and EELS fitting
 #
 # This file is part of  HyperSpy.
 #
@@ -16,6 +20,7 @@
 # You should have received a copy of the GNU General Public License
 # along with  HyperSpy.  If not, see <http://www.gnu.org/licenses/>.
 
+import numpy as np
 
 def _is_iter(val):
     "Checks if value is a list or tuple"
@@ -158,3 +163,44 @@ class current_model_values():
                     html += current_component_values(
                         component=comp, only_free=self.only_free, only_active=self.only_active)._repr_html_()
         return html
+
+def linear_regression(y, comp_data):
+    '''
+    Performs linear regression on single pixels as well 
+    as multidimensional arrays
+
+    Parameters
+    ----------
+    y : array_like, shape: (signal_axis) or (nav_shape, signal_axis)
+        The data to be fit to
+    comp_data : array_like, shape: (number_of_comp, signal_axis) or (nav_shape, number_of_comp, signal_axis)
+        The components to fit to the data
+
+    Returns:
+    ----------
+    fit_coefficients : array_like, shape: (number_of_comp) or (nav_shape, number_of_comp)
+
+    '''
+    square = np.matmul(comp_data, comp_data.T)
+    square_inv = np.linalg.inv(square)
+    comp_data2 = np.matmul(square_inv, comp_data)
+    return np.dot(y, comp_data2.T)
+
+def standard_error_from_covariance(covariance):
+    standard_error = np.sqrt(covariance.diagonal(axis1=-2, axis2=-1))
+    return standard_error
+
+def get_top_parent_twin(parameter):
+    'Get the top parent twin, if there is one'
+    if parameter.twin:
+        return get_top_parent_twin(parameter.twin)
+    else:
+        return parameter
+
+def get_full_twin_function(parameter):
+    'If there is chaining of twins, get the full twin_function'
+    func = twin_function
+    if parameter.twin:
+        return get_top_parent_twin(parameter.twin)
+    else:
+        return parameter

@@ -130,6 +130,20 @@ class Gaussian(Expression):
         self.isbackground = False
         self.convolved = True
 
+    def function(self, x, multi=False):
+        "This function is only used for linear multifit. Should ideally be replaced in Expression. the non-multifit part can be completely removed."
+        if multi:
+            n = self.model.axes_manager.signal_dimension
+            shape = self.A.map['values'].shape
+            A = self.A.map['values'].reshape(shape + n*(1,))
+            s = self.sigma.map['values'].reshape(shape + n*(1,))
+            c = self.centre.map['values'].reshape(shape + n*(1,))
+        else:
+            A = self.A.value
+            s = self.sigma.value
+            c = self.centre.value
+        return A * (1 / (s * sqrt2pi)) * np.exp(-(x - c)**2 / (2 * s**2))
+
     def estimate_parameters(self, signal, x1, x2, only_current=False):
         """Estimate the Gaussian by calculating the momenta.
 

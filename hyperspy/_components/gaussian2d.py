@@ -107,6 +107,28 @@ class Gaussian2D(Expression):
         self.isbackground = False
         self.convolved = True
 
+    def function(self, x, y, multi=False):
+        "TODO This function is only used for linear multifit. Should ideally be replaced in Expression. the non-multifit part can be completely removed."
+        if multi:
+            sig_dim = self.model.axes_manager.signal_dimension
+            shape = self.A.map['values'].shape
+            A = self.A.map['values'].reshape(shape + sig_dim*(1,))
+            sx = self.sigma_x.map['values'].reshape(shape + sig_dim*(1,))
+            sy = self.sigma_y.map['values'].reshape(shape + sig_dim*(1,))
+            x0 = self.centre_x.map['values'].reshape(shape + sig_dim*(1,))
+            y0 = self.centre_y.map['values'].reshape(shape + sig_dim*(1,))
+        
+        else:
+            A = self.A.value
+            sx = self.sigma_x.value
+            sy = self.sigma_y.value
+            x0 = self.centre_x.value
+            y0 = self.centre_y.value
+
+        return A * (1 / (sx * sy * pi2)) * np.exp(-((x - x0) ** 2
+                                                    / (2 * sx ** 2)
+                                                    + (y - y0) ** 2
+                                                    / (2 * sy ** 2)))
     @property
     def fwhm_x(self):
         return self.sigma_x.value * sigma2fwhm

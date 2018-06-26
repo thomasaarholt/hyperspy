@@ -132,14 +132,19 @@ class Offset(Component):
         
 =======
 
+<<<<<<< HEAD
 >>>>>>> Linear model fitting functions
     @property
     def constant_term(self):
+=======
+    def get_constant_term(self, multi=False):
+>>>>>>> Squash: Linear Model and EELS fitting
         "Get value of constant term of component"
         # First get currently constant parameters
         if self.offset.free:
             return 0
         else:
+<<<<<<< HEAD
             return self.offset.value
 <<<<<<< HEAD
 >>>>>>> Linearity attribute to parameters
@@ -153,3 +158,9 @@ class Offset(Component):
         else:
             return None
 >>>>>>> Linear model fitting functions
+=======
+            if multi:
+                return self.offset.map['values']
+            else:
+                return self.offset.value
+>>>>>>> Squash: Linear Model and EELS fitting

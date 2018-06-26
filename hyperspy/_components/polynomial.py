@@ -159,9 +159,15 @@ def convert_to_polynomial(poly_dict):
     return poly2_dict
 =======
     
-    @property
-    def constant_term(self):
+    def get_constant_term(self, multi=False):
         "Get value of constant term of component"
         # First get currently constant parameters
+<<<<<<< HEAD
         return self.coefficients.value[-1]
 >>>>>>> Linearity attribute to parameters
+=======
+        if multi:
+            return self.coefficients.map['values']
+        else:
+            return self.coefficients.value[-1]
+>>>>>>> Squash: Linear Model and EELS fitting

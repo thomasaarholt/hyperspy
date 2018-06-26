@@ -86,6 +86,20 @@ class PowerLaw(Expression):
         self.isbackground = True
         self.convolved = False
 
+   def function(self, x, multi=False):
+        "TODO This function is only used for linear multifit. Should ideally be replaced in Expression. the non-multifit part can be completely removed."
+        if multi:
+            n = self.model.axes_manager.signal_dimension
+            shape = self.A.map['values'].shape
+            A = self.A.map['values'].reshape(shape + n*(1,))
+            r = self.r.map['values'].reshape(shape + n*(1,))
+            origin = self.origin.map['values'].reshape(shape + n*(1,))
+        else:
+            A = self.A.value
+            r = self.r.value
+            origin = self.origin.value
+        return np.where(x > self.left_cutoff, A *(x - origin) ** (-r), 0)
+
     def estimate_parameters(self, signal, x1, x2, only_current=False,
                             out=False):
         """Estimate the parameters for the power law component by the two area
