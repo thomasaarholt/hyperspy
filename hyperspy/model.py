@@ -999,8 +999,9 @@ class BaseModel(list):
         """
 
         if fitter is None:
-            if self.check_all_active_components_are_linear():
+            if self._check_all_active_components_are_linear():
                 fitter = "linear"
+                print('linear')
             else: fitter = preferences.Model.default_fitter
         switch_aap = (update_plot != self._plot_active)
         if switch_aap is True and update_plot is False:
