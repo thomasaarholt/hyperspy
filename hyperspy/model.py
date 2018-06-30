@@ -1206,20 +1206,6 @@ class BaseModel(list):
 
                 def p0_index_from_parameter(parameter):
                     return self.free_parameters.index(parameter)
-                    
-                def _append_component_separated_elements(component):
-                    '''NOT CURRENTLY USED - The following code works for a model where 
-                    ax+b/x+c is a combination of three components, not one'''
-                    if component.free_parameters:
-                        # linear component to fit, with constant part
-                        # Constant part of just linear components
-                        index = p0_index_from_component(component)
-                        comp_data_constant_values[index] = component._compute_constant_term()
-                        comp_data[index] = component._compute_component()
-                    else:  # No free parameters, so component is a fixed.
-                        # Entire value of fixed components
-                        fixed_comp_data[:] += component._compute_component()
-                        fixed_comp_data_constant_values[:] += component._compute_constant_term()
 
                 def _append_component(component):
                     'The following code works for a model where ax+b/x+c can be multiple components, not only one'
@@ -1232,9 +1218,10 @@ class BaseModel(list):
                         if len(component.free_parameters) < 2:
                             comp_data[index] += component._compute_component()
                         else:
-                            # Must check that this component is based on Expression
+                            # Check that this component is based on Expression
+                            assert component._str_expression, \
+                            "Component {} has more than one free parameter, which is only supported for Expression type components."
                             free, fixed = component._separate_fixed_and_free_expression_elements()
-
                             for free_parameter in component.free_parameters:
                                 index = p0_index_from_parameter(free_parameter)
                                 print(index, free_parameter)
@@ -1253,7 +1240,7 @@ class BaseModel(list):
                     if comp.free_parameters: # Parent component not fixed
                         for twin in np.array(twinned_components)[indices]:
                             if len(component.free_parameters) < 2:
-                            comp_data[index] += twin._compute_component()
+                                comp_data[index] += twin._compute_component()
                             #recursively_add_twins(twin)
                     else: # Parent component is fixed, so all children are fixed too
                         for twin in np.array(twinned_components)[indices]:
@@ -1264,7 +1251,7 @@ class BaseModel(list):
                     if component not in twinned_components:
                         _append_component(component)
                         if component in twinned_components_parents:
-                            add_twins(component)                       
+                            add_twins(component)
 
                 def top_parent_twin(parameter):
                     if parameter.twin.twin:
