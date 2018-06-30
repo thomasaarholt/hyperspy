@@ -1,5 +1,4 @@
 import numpy as np
-
 from numpy.testing import assert_allclose
 
 import hyperspy.api as hs
@@ -75,7 +74,6 @@ class TestPowerLaw:
         assert_allclose(g.A.map["values"][1], 10.064378823244837)
         assert_allclose(g.r.map["values"][0], 4.0017522876514304)
 
-
 class TestOffset:
 
     def setup_method(self, method):
@@ -128,13 +126,9 @@ class TestPolynomial:
         # if same component is pased, axes_managers get mixed up, tests
         # sometimes randomly fail
         for _m in [self.m, self.m_2d, self.m_3d]:
-            _m[0].coefficients.value = coeff_values
-
-    def test_gradient(self):
-        c = self.m[0]
-        np.testing.assert_array_almost_equal(c.grad_coefficients(1),
-                                             np.array([[6, ], [4.5], [3.5]]))
-        assert c.grad_coefficients(np.arange(10)).shape == (3, 10)
+            _m[0].a.value = coeff_values[0]
+            _m[0].b.value = coeff_values[1]
+            _m[0].c.value = coeff_values[2]
 
     def test_estimate_parameters_binned(self):
         self.m.signal.metadata.Signal.binned = True
@@ -145,9 +139,9 @@ class TestPolynomial:
                               None,
                               None,
                               only_current=True)
-        assert_allclose(g.coefficients.value[0], 0.5)
-        assert_allclose(g.coefficients.value[1], 2)
-        assert_allclose(g.coefficients.value[2], 3)
+        assert_allclose(g.a.value, 0.5)
+        assert_allclose(g.b.value, 2)
+        assert_allclose(g.c.value, 3)
 
     def test_estimate_parameters_unbinned(self):
         self.m.signal.metadata.Signal.binned = False
@@ -158,9 +152,9 @@ class TestPolynomial:
                               None,
                               None,
                               only_current=True)
-        assert_allclose(g.coefficients.value[0], 0.5)
-        assert_allclose(g.coefficients.value[1], 2)
-        assert_allclose(g.coefficients.value[2], 3)
+        assert_allclose(g.a.value, 0.5)
+        assert_allclose(g.b.value, 2)
+        assert_allclose(g.c.value, 3)
 
     def test_2d_signal(self):
         # This code should run smoothly, any exceptions should trigger failure
@@ -169,8 +163,9 @@ class TestPolynomial:
         p = hs.model.components1D.Polynomial(order=2)
         model.append(p)
         p.estimate_parameters(s, 0, 100, only_current=False)
-        np.testing.assert_allclose(p.coefficients.map['values'],
-                                   np.tile([0.5, 2, 3], (10, 1)))
+        np.testing.assert_allclose(p.a.map['values'], 0.5)
+        np.testing.assert_allclose(p.b.map['values'], 2)
+        np.testing.assert_allclose(p.c.map['values'], 3)
 
     def test_3d_signal(self):
         # This code should run smoothly, any exceptions should trigger failure
@@ -179,9 +174,9 @@ class TestPolynomial:
         p = hs.model.components1D.Polynomial(order=2)
         model.append(p)
         p.estimate_parameters(s, 0, 100, only_current=False)
-        np.testing.assert_allclose(p.coefficients.map['values'],
-                                   np.tile([0.5, 2, 3], (2, 5, 1)))
-
+        np.testing.assert_allclose(p.a.map['values'], 0.5)
+        np.testing.assert_allclose(p.b.map['values'], 2)
+        np.testing.assert_allclose(p.c.map['values'], 3)
 
 class TestGaussian:
 
@@ -330,7 +325,6 @@ class TestScalableFixedPattern:
                             category=RuntimeWarning):
             m.fit()
         assert abs(fp.yscale.value - 10) <= .1
-
 
 class TestHeavisideStep:
 
