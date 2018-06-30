@@ -1229,7 +1229,7 @@ class BaseModel(list):
                         index = p0_index_from_component(component)
                         print(index, component)
                         comp_data_constant_values[index] += component._compute_constant_term()
-                        if len(component.free_parameters) < 2 :
+                        if len(component.free_parameters) < 2:
                             comp_data[index] += component._compute_component()
                         else:
                             # Must check that this component is based on Expression
@@ -1252,7 +1252,9 @@ class BaseModel(list):
                     index = p0_index_from_component(comp)
                     if comp.free_parameters: # Parent component not fixed
                         for twin in np.array(twinned_components)[indices]:
+                            if len(component.free_parameters) < 2:
                             comp_data[index] += twin._compute_component()
+                            
                             #recursively_add_twins(twin)
                     else: # Parent component is fixed, so all children are fixed too
                         for twin in np.array(twinned_components)[indices]:
