@@ -156,9 +156,18 @@ class Expression(Component):
     def compile_function(self, module="numpy", position=False):
         import sympy
         from sympy.utilities.lambdify import lambdify
+        try:# Expression is just a constant
+            int(self._str_expression)
+        except:
+            pass
+        else:
+            raise AttributeError('Expression must contain a symbol, i.e. x, a, etc.')
         expr = _parse_substitutions(self._str_expression)
         # Extract x
-        x, = [symbol for symbol in expr.free_symbols if symbol.name == "x"]
+        x = [symbol for symbol in expr.free_symbols if symbol.name == "x"]
+        if not x: # Expression is just a parameter, no x -> Offset
+            x = ['x']
+        x = x[0]
         # Extract y
         y = [symbol for symbol in expr.free_symbols if symbol.name == "y"]
         self._is2D = True if y else False
