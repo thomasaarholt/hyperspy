@@ -1254,7 +1254,6 @@ class BaseModel(list):
                         for twin in np.array(twinned_components)[indices]:
                             if len(component.free_parameters) < 2:
                             comp_data[index] += twin._compute_component()
-                            
                             #recursively_add_twins(twin)
                     else: # Parent component is fixed, so all children are fixed too
                         for twin in np.array(twinned_components)[indices]:
