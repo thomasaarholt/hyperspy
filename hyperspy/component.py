@@ -1202,7 +1202,8 @@ class Component(t.HasTraits):
 
     @property
     def _free_offset_parameter(self):
-        "Attribute containing any free parameter that acts as an offset"
+        """Attribute containing any free parameter that acts as an offset
+        Needs to be subtracted once from the model as it is added twice"""
         return None
 
     def _check_only_one_linear_parameter(self):
@@ -1217,3 +1218,43 @@ class Component(t.HasTraits):
         if n_free > 1:
             raise AttributeError("Component " + str(self) +
                                  " has more than one linear component.")
+
+    def _compute_component(self):
+        model = self.model
+        signal_axis = model.axis.axis[np.where(self.model.channel_switches)]
+        if model.convolved and self.convolved:
+            data = self._convolve(self.function(model.convolution_axis), model=model)
+        else:
+            not_convolved = self.function(signal_axis)
+            data = not_convolved
+        return data
+
+    def _compute_constant_term(self):
+        model = self.model
+        signal_axis = model.axis.axis[np.where(model.channel_switches)]
+        if model.convolved and self.convolved:
+            data = self._convolve(self.constant_term, model=model)
+        else:
+            not_convolved = self.constant_term * np.ones(signal_axis.shape)
+            data = not_convolved
+        return data
+
+    def _compute_free_offset_parameter_value(self):
+        model = self.model
+        if model.convolved and self.convolved:
+            offset = self._convolve(self._free_offset_parameter.value, model=model)
+        else:
+            offset = self._free_offset_parameter.value
+        return offset
+
+    def _convolve(self, to_convolve, model=None):
+        '''Convolve component with model convolution axis
+        
+        Multiply by np.ones in order to handle constant case - has no effect on
+        the large'''
+        if model == None:
+            model = self.model
+        convolved = np.convolve(
+                to_convolve * np.ones(model.convolution_axis.shape), model.low_loss(model.axes_manager), mode="valid")
+        convolved = convolved[np.where(model.channel_switches)]
+        return convolved

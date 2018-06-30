@@ -1,6 +1,7 @@
 from functools import wraps
 from hyperspy.component import Component
 import sympy
+from sympy.utilities.lambdify import lambdify
 
 _CLASS_DOC = \
     """%s component (created with Expression).
@@ -158,7 +159,6 @@ class Expression(Component):
             para._is_linear = check_parameter_linearity(expression, para.name)
 
     def compile_function(self, module="numpy", position=False):
-        from sympy.utilities.lambdify import lambdify
         expr = _parse_substitutions(self._str_expression)
         # Extract x
         x, = [symbol for symbol in expr.free_symbols if symbol.name == "x"]
@@ -228,7 +228,7 @@ class Expression(Component):
 
     @property
     def constant_term(self):
-        "Get value of constant term of component"
+        "Get value of constant term of free component"
         # First get currently constant parameters
         linear_parameters = []
         for para in self.free_parameters:
@@ -254,6 +254,40 @@ class Expression(Component):
                 offset_parameter = para
         return offset_parameter
 
+    def _separate_fixed_and_free_expression_elements(self):
+        expr = self._str_expression
+        ex = sympy.sympify(expr)
+        remaining_elements = ex.copy()
+        pseudo_components = {}
+        for para in self.free_parameters:
+            element = ex.as_independent(para.name)[-1]
+            remaining_elements -= element
+            pseudo_components[para.name] = lambdify('x', 
+                element.subs(para.name, para.value), modules='numpy')
+        fixed_parameters = list(set(self.parameters) - set(self.free_parameters))
+        fixed_parameter_values = [(para.name, para.value) for para in fixed_parameters]
+        fixed_part = lambdify('x', remaining_elements.subs(fixed_parameter_values), modules='numpy')
+        return pseudo_components, fixed_part
+
+    def _compute_expression_part(self, function):
+        model = self.model
+        if model.convolved and self.convolved:
+            data = self._convolve(function(model.convolution_axis), model=model)
+        else:
+            data = function(model.axis.axis)
+        return data
+
+
+    def _compute_expression_part_old(self, parameter):
+        model = self.model
+        ex = sympy.sympify(self._str_expression)
+
+        function = lambdify('x', ex.as_independent(parameter.name)[-1].subs(parameter.name, parameter.value), modules='numpy')
+        if model.convolved and self.convolved:
+            data = self._convolve(function(model.convolution_axis), model=model)
+        else:
+            data = function(model.axis.axis)
+        return data
 
 def check_parameter_linearity(expr, name):
     "Check whether expression is linear for a given parameter"

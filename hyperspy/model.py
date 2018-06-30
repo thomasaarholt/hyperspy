@@ -689,12 +689,14 @@ class BaseModel(list):
 
     def _set_p0(self):
         self.p0 = ()
+        self.free_parameters = ()
         for component in self:
             if component.active:
                 for parameter in component.free_parameters:
                     self.p0 = (self.p0 + (parameter.value,)
                                if parameter._number_of_elements == 1
                                else self.p0 + parameter.value)
+                    self.free_parameters = self.free_parameters + (parameter, )
 
     def set_boundaries(self):
         """Generate the boundary list.
@@ -1187,81 +1189,113 @@ class BaseModel(list):
                 nonlinear = self._get_nonlinear_components()
                 if nonlinear:
                     raise AttributeError(not_linear_error + str(nonlinear))
-                # INCLUDE CHECK that there is at least 1 COMPONENT - if none,
-                # raise error
 
-                # TODO: May need to add all components that are linearly twinned with
-                # a component in order to scale them correctly. Should try and see what would 
-                # happen if I had three gaussians ABC, where B is twinned and follows A, but B and C
-                # are in similar positions. Will C be overfit in the position where B would normally sit?
-                #  
                 self._check_and_set_linear_parameters_not_zero()
                 self._set_p0()
                 number_of_free_parameters = len(self.p0)
-                signal_axis = self.axis.axis[np.where(self.channel_switches)]
+                assert number_of_free_parameters > 0, 'Model does not contain any free components!'
                 
+                signal_axis = self.axis.axis[np.where(self.channel_switches)]
                 comp_data = np.zeros((number_of_free_parameters,) + signal_axis.shape)
                 comp_data_constant_values = np.zeros((number_of_free_parameters,) + signal_axis.shape)
                 fixed_comp_data = np.zeros(signal_axis.shape)
                 fixed_comp_data_constant_values = np.zeros(signal_axis.shape)
 
-                def maybe_convolve(thing):
-                    'Convolve component data if necessary'
-                    import numbers
+                def p0_index_from_component(component):
+                    return self.free_parameters.index(component.free_parameters[0])
+
+                def p0_index_from_parameter(parameter):
+                    return self.free_parameters.index(parameter)
                     
-                    if component.convolved and self.convolved:
-                        if isinstance(thing, numbers.Number):
-                            convolved = np.convolve(
-                                thing * np.ones(self.convolution_axis.shape), self.low_loss(self.axes_manager), mode="valid")
-                            convolved = convolved[np.where(self.channel_switches)]
-                        else:
-                            convolved = np.convolve(thing(self.convolution_axis), self.low_loss(
-                                self.axes_manager), mode="valid")
-                            convolved = convolved[np.where(self.channel_switches)]
-                        data = convolved
-
-                    else:
-                        if isinstance(thing, numbers.Number):
-                            not_convolved = thing * np.ones(signal_axis.shape)
-                        else:
-                            not_convolved = thing(signal_axis)
-                        data = not_convolved
-                    return data
-
-                def append_component():
-                    'Separate free and constant data for fitting'
+                def _append_component_separated_elements(component):
+                    '''NOT CURRENTLY USED - The following code works for a model where 
+                    ax+b/x+c is a combination of three components, not one'''
                     if component.free_parameters:
                         # linear component to fit, with constant part
                         # Constant part of just linear components
-                        comp_data_constant_values[self.current_free_param] = maybe_convolve(component.constant_term)
-                        if not component._free_offset_parameter or component._free_offset_parameter and len(component.parameters) < 2 :
-                            comp_data[self.current_free_param] = maybe_convolve(component.function)
-                            self.current_free_param += 1
-                        else:
-                            comp_data[self.current_free_param] = maybe_convolve(component.function) - maybe_convolve(component._free_offset_parameter.value)
-                            comp_data[self.current_free_param+1] = maybe_convolve(component._free_offset_parameter.value)
-                            self.current_free_param += 2
+                        index = p0_index_from_component(component)
+                        comp_data_constant_values[index] = component._compute_constant_term()
+                        comp_data[index] = component._compute_component()
                     else:  # No free parameters, so component is a fixed.
                         # Entire value of fixed components
-                        fixed_comp_data[:] += maybe_convolve(component.function)
-                        fixed_comp_data_constant_values[:] += maybe_convolve(component.constant_term)
-                    return
+                        fixed_comp_data[:] += component._compute_component()
+                        fixed_comp_data_constant_values[:] += component._compute_constant_term()
 
-                def is_twinned(component):
-                    twinned = False
-                    for para in component.parameters:
-                        if para.twin:
-                            twinned = True
-                            break
-                    return twinned
+                def _append_component(component):
+                    'The following code works for a model where ax+b/x+c can be multiple components, not only one'
+                    if component.free_parameters:
+                        # linear component to fit, with constant part
+                        # Constant part of just linear components
+                        index = p0_index_from_component(component)
+                        print(index, component)
+                        comp_data_constant_values[index] += component._compute_constant_term()
+                        if len(component.free_parameters) < 2 :
+                            comp_data[index] += component._compute_component()
+                        else:
+                            # Must check that this component is based on Expression
+                            free, fixed = component._separate_fixed_and_free_expression_elements()
 
-                self.current_free_param = 0
+                            for free_parameter in component.free_parameters:
+                                index = p0_index_from_parameter(free_parameter)
+                                print(index, free_parameter)
+                                comp_data[index] += component._compute_expression_part(free[free_parameter.name])
+                            fixed_comp_data[:] += component._compute_expression_part(fixed)
+                    else:  
+                        # No free parameters, so component is a fixed.
+                        # Entire value of fixed components
+                        fixed_comp_data[:] += component._compute_component()
+                        fixed_comp_data_constant_values[:] += component._compute_constant_term()
+
+                def add_twins(comp):
+                    'Accounts for situation where twins have been chained'
+                    indices = [i for i, x in enumerate(twinned_components_parents) if x == comp]
+                    index = p0_index_from_component(comp)
+                    if comp.free_parameters: # Parent component not fixed
+                        for twin in np.array(twinned_components)[indices]:
+                            comp_data[index] += twin._compute_component()
+                            #recursively_add_twins(twin)
+                    else: # Parent component is fixed, so all children are fixed too
+                        for twin in np.array(twinned_components)[indices]:
+                            fixed_comp_data[:] += twin._compute_component()
+
+                def append_component(component):
+                    'Separate free and constant data for fitting'
+                    if component not in twinned_components:
+                        _append_component(component)
+                        if component in twinned_components_parents:
+                            add_twins(component)                       
+
+                def top_parent_twin(parameter):
+                    if parameter.twin.twin:
+                        return top_parent_twin(parameter.twin)
+                    else:
+                        return parameter.twin
+
+                # Create a list of twinned components and their parents
+                twinned_components_parents = []
+                twinned_parameters_parents = []
+                twinned_components = []
+                twinned_parameters = []
+                for comp in self:
+                    for para in comp.parameters:
+                        if para.twin and para._is_linear:
+                            twinned_components.append(comp)
+                            twinned_parameters.append(para)
+                            parent = top_parent_twin(para)
+                            twinned_parameters_parents.append(parent)
+                            twinned_components_parents.append(parent.component)
+                self.twinned_components_parents = twinned_components_parents
+                self.twinned_components = twinned_components
+                # Since each component can have more than one linear parameter, like Expression('a*x+b/x+c'), 
+                # we need to keep track of the free parameters, not just which component we are on
                 for component in self:
-                    append_component()
+                    if component.active and component not in twinned_components:
+                        append_component(component)
+                    # There is case for fixed components that are twinned to only fixed components, that is not covered here
 
-                comp_data = comp_data - comp_data_constant_values
-                model_constant_term = self._get_constant_term()
-
+                comp_data = comp_data - comp_data_constant_values # the linear data
+                model_constant_term = self._get_constant_term() # constant term to subtract from data before fitting
+                self.comp_data_constant_values = comp_data_constant_values
                 y = self.signal()[np.where(self.channel_switches)]
 
                 if self.signal.metadata.Signal.binned == True:
@@ -1273,17 +1307,16 @@ class BaseModel(list):
                 fixed_values = fixed_comp_data - fixed_comp_data_constant_values
 
                 y = y - model_constant_term - fixed_values
+
                 if bounded:
                     self.set_boundaries()
                     bounds = self.free_parameters_boundaries
-                    self._set_p0()
-                    current_values = self.p0
                     # Must scale bounds by current value as bounds refer to
                     # scaling factor
                     new_bounds = ([bmin / value if bmin is not None else -np.inf
-                                   for (bmin, bmax), value in zip(bounds, current_values)],
+                                   for (bmin, bmax), value in zip(bounds, self.p0)],
                                   [bmax / value if bmax is not None else np.inf
-                                   for (bmin, bmax), value in zip(bounds, current_values)])
+                                   for (bmin, bmax), value in zip(bounds, self.p0)])
 
                     output = linear(comp_data.T, y, bounds=new_bounds)
                 else:
@@ -1293,7 +1326,9 @@ class BaseModel(list):
                                  fit_coefficient in zip(self.p0, fit_coefficients)])
                 self.fit_output = output
                 self.comp_data = comp_data
-
+                self.comp_data_constant_values = comp_data_constant_values
+                self.fixed_comp_data = fixed_comp_data
+                self.fixed_comp_data_constant_values = fixed_comp_data_constant_values
             else:
                 # General optimizers
                 # Least squares or maximum likelihood
