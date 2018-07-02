@@ -1,6 +1,7 @@
 from functools import wraps
 from hyperspy.component import Component
 import sympy
+import numpy as np
 from sympy.utilities.lambdify import lambdify
 
 _CLASS_DOC = \
@@ -274,19 +275,7 @@ class Expression(Component):
         if model.convolved and self.convolved:
             data = self._convolve(function(model.convolution_axis), model=model)
         else:
-            data = function(model.axis.axis)
-        return data
-
-
-    def _compute_expression_part_old(self, parameter):
-        model = self.model
-        ex = sympy.sympify(self._str_expression)
-
-        function = lambdify('x', ex.as_independent(parameter.name)[-1].subs(parameter.name, parameter.value), modules='numpy')
-        if model.convolved and self.convolved:
-            data = self._convolve(function(model.convolution_axis), model=model)
-        else:
-            data = function(model.axis.axis)
+            data = function(model.axis.axis[np.where(model.channel_switches)])
         return data
 
 def check_parameter_linearity(expr, name):
