@@ -8,8 +8,11 @@ from hyperspy._signals.signal1d import Signal1D
 from hyperspy._components.gaussian import Gaussian
 from hyperspy._components.power_law import PowerLaw
 from hyperspy._components.expression import Expression
+from hyperspy._components.offset import Offset
+
 
 from hyperspy.datasets.example_signals import EDS_SEM_Spectrum
+from hyperspy.datasets.artificial_data import get_low_loss_eels_signal, get_core_loss_eels_signal
 from hyperspy.misc.utils import slugify
 from hyperspy.decorators import lazifyTestClass
 
@@ -110,19 +113,25 @@ class TestLinearFitting:
 
 class TestLinearEELSFitting:
     def setup_method(self, method):
-        self.ll, self.cl = eelsdb(title = 'Niobium Oxide', author='Wilfred Sigle')[:2]
-        self.cl2 = self.cl.remove_background((100.,200.))
-        self.m = self.cl2.create_model(auto_background=False)
-        self.m_convolved = self.cl2.create_model(auto_background=False, ll=self.ll)
+        self.ll = get_low_loss_eels_signal()
+        self.cl = get_core_loss_eels_signal()
+        self.cl.add_elements(('Mn',))
+        self.m = self.cl.create_model(auto_background=False)
+        self.m[0].onset_energy.value = 673.
+        self.m_convolved = self.cl.create_model(auto_background=False, ll=self.ll)
+        self.m_convolved[0].onset_energy.value = 673.
 
-    def test_convolved(self):
+    def test_convolved_and_std_error(self):
         m = self.m_convolved
         m.fit('linear')
         linear = m.as_signal()
+        std_linear = m.p_std
         m.fit('leastsq')
         leastsq = m.as_signal()
+        std_leastsq = m.p_std
         diff = linear - leastsq
         np.testing.assert_almost_equal(diff.data.sum(), 0.0, decimal=2)
+        np.testing.assert_almost_equal(std_linear, std_leastsq, decimal=5)
 
     def test_nonconvolved(self):
         m = self.m
@@ -132,14 +141,30 @@ class TestLinearEELSFitting:
         leastsq = m.as_signal()
         diff = linear - leastsq
         np.testing.assert_almost_equal(diff.data.sum(), 0.0, decimal=2)
-
+    # The following twos tests need a model based on cl spectrum with more 
+    # components
+    
     def test_chained_twins(self):
         m = self.m
-        m[4].parameters[0].twin = m[3].parameters[0]
-        m[3].parameters[0].twin = m[2].parameters[0]
+        m[2].parameters[0].twin = m[1].parameters[0]
+        m[1].parameters[0].twin = m[0].parameters[0]
         m.fit('linear')
         linear = m.as_signal()
         m.fit('leastsq')
         leastsq = m.as_signal()
         diff = linear - leastsq
         np.testing.assert_almost_equal(diff.data.sum(), 0.0, decimal=2)
+        
+
+    def test_fit_fix_fit(self):
+        'Fit with twinned components after the top parent twin becomes fixed'
+        m = self.m_convolved
+        m.append(Offset()) # Need some random free component in the mix as well
+        m.fit('linear')
+        data1 = m.as_signal().data
+        m[2].parameters[0].twin = m[1].parameters[0]
+        m[1].parameters[0].twin = m[0].parameters[0]
+        m[0].set_parameters_not_free()
+        m.fit('linear')
+        data2 = m.as_signal().data
+        np.testing.assert_almost_equal(data1, data2)
