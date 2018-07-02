@@ -10,11 +10,12 @@ from hyperspy._components.power_law import PowerLaw
 from hyperspy._components.expression import Expression
 from hyperspy._components.offset import Offset
 
-
 from hyperspy.datasets.example_signals import EDS_SEM_Spectrum
-from hyperspy.datasets.artificial_data import get_low_loss_eels_signal, get_core_loss_eels_signal
+from hyperspy.datasets.artificial_data import get_low_loss_eels_signal
+from hyperspy.datasets.artificial_data import get_core_loss_eels_signal
 from hyperspy.misc.utils import slugify
 from hyperspy.decorators import lazifyTestClass
+
 
 @lazifyTestClass
 class TestModelFitBinned:
@@ -36,7 +37,8 @@ class TestModelFitBinned:
 
     def test_model_is_not_linear(self):
         """
-        Model is not currently linear as Gaussian sigma and centre parameters are free
+        Model is not currently linear as Gaussian sigma and centre parameters
+        are free
         """
         assert not self.m._check_all_active_components_are_linear()
 
@@ -47,6 +49,7 @@ class TestModelFitBinned:
         np.testing.assert_allclose(self.m[0].A.value, 6132.640632924692, 1)
         np.testing.assert_allclose(self.m[0].centre.value, 0.5)
         np.testing.assert_allclose(self.m[0].sigma.value, 1)
+
 
 @lazifyTestClass
 class TestMultifit:
@@ -83,33 +86,41 @@ class TestMultifit:
         np.testing.assert_array_almost_equal(self.m[0].A.map['values'],
                                              [4., 4.])
 
+
 class TestLinearFitting:
     def setup_method(self, method):
         self.s = EDS_SEM_Spectrum().isig[5.0:15.0]
         self.m = self.s.create_model(auto_background=False)
-        self.c = Expression('a*x+b', 'Linear')
+        self.c = Expression('a*x+b', 'line with offset')
         self.m.append(self.c)
 
     def test_linear_fitting_with_offset(self):
         m = self.m
         m.fit('linear')
         linear = m.as_signal()
-        np.testing.assert_allclose(m.p0, np.array([   933.234307,  47822.980041,  -5867.611809,  56805.51892 ]))
-        
+        np.testing.assert_allclose(m.p0, np.array(
+            [933.234307, 47822.980041, -5867.611809, 56805.51892]))
+
         m.fit('leastsq')
         leastsq = m.as_signal()
         diff = (leastsq - linear)
-        assert diff.data.sum() == 0
-
-    def test_free_offset_value(self):
-        c = self.c
-        c.a.free = False
-        assert c._compute_free_offset_parameter_value() == c.b.value
+        np.testing.assert_almost_equal(diff.data.sum(), 0.0, decimal=4)
 
     def test_fixed_offset_value(self):
         c = self.c
         m = self.m
-        assert (c._compute_constant_term() - c.b.value*np.ones(m.axis.axis.shape)).sum() == 0
+        constant = c._compute_constant_term()
+        assert (constant - c.b.value*np.ones(m.axis.axis.shape)).sum() == 0
+
+    def test_3rd_order_polynomial(self):
+        m = self.m
+        m.remove(self.c)
+        c2 = Expression('a*x**3+b*x**2+c*x+d', '3rd Poly')
+        m.append(c2)
+        m.fit('linear')
+        diff = (self.s - m.as_signal())
+        np.testing.assert_almost_equal(diff.data.sum(), 0)
+
 
 class TestLinearEELSFitting:
     def setup_method(self, method):
@@ -141,30 +152,30 @@ class TestLinearEELSFitting:
         leastsq = m.as_signal()
         diff = linear - leastsq
         np.testing.assert_almost_equal(diff.data.sum(), 0.0, decimal=2)
-    # The following twos tests need a model based on cl spectrum with more 
-    # components
-    
-    def test_chained_twins(self):
-        m = self.m
-        m[2].parameters[0].twin = m[1].parameters[0]
-        m[1].parameters[0].twin = m[0].parameters[0]
-        m.fit('linear')
-        linear = m.as_signal()
-        m.fit('leastsq')
-        leastsq = m.as_signal()
-        diff = linear - leastsq
-        np.testing.assert_almost_equal(diff.data.sum(), 0.0, decimal=2)
-        
 
-    def test_fit_fix_fit(self):
-        'Fit with twinned components after the top parent twin becomes fixed'
-        m = self.m_convolved
-        m.append(Offset()) # Need some random free component in the mix as well
-        m.fit('linear')
-        data1 = m.as_signal().data
-        m[2].parameters[0].twin = m[1].parameters[0]
-        m[1].parameters[0].twin = m[0].parameters[0]
-        m[0].set_parameters_not_free()
-        m.fit('linear')
-        data2 = m.as_signal().data
-        np.testing.assert_almost_equal(data1, data2)
+    # The following twos tests need a model based on cl spectrum with more 
+    # components. Does not work with hydrogenic GOS as there Mn_L3 == Mn_L2
+
+    # def test_chained_twins(self):
+    #     m = self.m
+    #     m[2].parameters[0].twin = m[1].parameters[0]
+    #     m[1].parameters[0].twin = m[0].parameters[0]
+    #     m.fit('linear')
+    #     linear = m.as_signal()
+    #     m.fit('leastsq')
+    #     leastsq = m.as_signal()
+    #     diff = linear - leastsq
+    #     np.testing.assert_almost_equal(diff.data.sum(), 0.0, decimal=2)
+
+    # def test_fit_fix_fit(self):
+    #     'Fit with twinned components after the top parent twin becomes fixed'
+    #     m = self.m_convolved
+    #     m.append(Offset()) # Need random free component in the mix as well
+    #     m.fit('linear')
+    #     data1 = m.as_signal().data
+    #     m[2].parameters[0].twin = m[1].parameters[0]
+    #     m[1].parameters[0].twin = m[0].parameters[0]
+    #     m[0].set_parameters_not_free()
+    #     m.fit('linear')
+    #     data2 = m.as_signal().data
+    #     np.testing.assert_almost_equal(data1, data2)
