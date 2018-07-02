@@ -1096,8 +1096,8 @@ class BaseModel(list):
             args = (self.signal()[np.where(self.channel_switches)],
                     weights)
 
-            not_linear_error = "Not all components are linear_lstsq. Fit with a " + \
-                               "different fitter or set non-linear_lstsq " + \
+            not_linear_error = "Not all components are linear. Fit with a " + \
+                               "different fitter or set non-linear " + \
                                "`parameters.free = False`. These " + \
                                "components are nonlinear:"
 
@@ -1213,7 +1213,6 @@ class BaseModel(list):
                         # linear component to fit, with constant part
                         # Constant part of just linear components
                         index = p0_index_from_component(component)
-                        print(index, component)
                         comp_data_constant_values[index] += component._compute_constant_term()
                         if len(component.free_parameters) < 2:
                             comp_data[index] += component._compute_component()
@@ -1224,7 +1223,6 @@ class BaseModel(list):
                             free, fixed = component._separate_fixed_and_free_expression_elements()
                             for free_parameter in component.free_parameters:
                                 index = p0_index_from_parameter(free_parameter)
-                                print(index, free_parameter)
                                 comp_data[index] += component._compute_expression_part(free[free_parameter.name])
                             fixed_comp_data[:] += component._compute_expression_part(fixed)
                     else:  
@@ -1233,12 +1231,23 @@ class BaseModel(list):
                         fixed_comp_data[:] += component._compute_component()
                         fixed_comp_data_constant_values[:] += component._compute_constant_term()
 
+                def get_parent_twin(parameter):
+                    if parameter.twin:
+                        return get_parent_twin(parameter.twin)
+                    else:
+                        return parameter
+
                 def add_twins(comp):
                     'Accounts for situation where twins have been chained'
                     indices = [i for i, x in enumerate(twinned_components_parents) if x == comp]
-                    index = p0_index_from_component(comp)
                     if comp.free_parameters: # Parent component not fixed
+                        # Need to cover case when a double element Expression (a*x**2 + b*x)
+                        # has two other components as children twins
+                        # Currently the function can't decipher the first from the second twin,
+                        # and will enter the data into the first p0 index
                         for twin in np.array(twinned_components)[indices]:
+                            parent_parameter = get_parent_twin(twinned_parameters[twinned_components.index(twin)])
+                            index = p0_index_from_parameter(parent_parameter)
                             if len(component.free_parameters) < 2:
                                 comp_data[index] += twin._compute_component()
                             #recursively_add_twins(twin)
@@ -1259,6 +1268,30 @@ class BaseModel(list):
                     else:
                         return parameter.twin
 
+                def calculate_covariance_matrix(A, b):
+                    '''Calculate covariance matrix after performing Linear Regression
+                    
+                    Parameters:
+                    fit: The resultant fit after performing fitting, same shape as b
+                    A: The component matrix fitted against
+                    b: The raw data fitted to
+
+                    '''
+                    n = b.shape[0]
+                    k = A.shape[-1]
+                    residual = b - (self._fit_coefficients*A).sum(-1)
+
+                    residual_dot = np.dot(residual.T, residual)
+                    component_dot = np.dot(A.T,A)
+                    inverse_component_dot = np.linalg.inv(component_dot)
+                    
+                    covariance = (1/(n-k)) * np.dot(residual_dot, inverse_component_dot)
+                    return covariance
+
+                def standard_error_from_covariance(covariance):
+                    standard_error = np.sqrt(np.diagonal(covariance))
+                    return standard_error
+                    
                 # Create a list of twinned components and their parents
                 twinned_components_parents = []
                 twinned_parameters_parents = []
@@ -1309,14 +1342,14 @@ class BaseModel(list):
                     output = linear(comp_data.T, y, bounds=new_bounds)
                 else:
                     output = linear(comp_data.T, y)
-                fit_coefficients = output["x"]
-                self.p0 = tuple([oldp0 * fit_coefficient for oldp0,
-                                 fit_coefficient in zip(self.p0, fit_coefficients)])
-                self.fit_output = output
                 self.comp_data = comp_data
-                self.comp_data_constant_values = comp_data_constant_values
-                self.fixed_comp_data = fixed_comp_data
-                self.fixed_comp_data_constant_values = fixed_comp_data_constant_values
+                self.fit_output = output
+                self._fit_coefficients = output["x"]
+                self.p0 = tuple([oldp0 * fit_coefficient for oldp0,
+                                 fit_coefficient in zip(self.p0, self._fit_coefficients)])
+                covariance = calculate_covariance_matrix(comp_data.T, y)
+                self.p_std = self.p0*standard_error_from_covariance(covariance)
+
             else:
                 # General optimizers
                 # Least squares or maximum likelihood
