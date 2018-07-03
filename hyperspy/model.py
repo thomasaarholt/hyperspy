@@ -862,23 +862,185 @@ class BaseModel(list):
         return nonlinear
 
     def _check_and_set_linear_parameters_not_zero(self):
-        """Linear components will not scale correctly if they are currently set to zero"""
+        """Linear components will not scale correctly if they are currently
+        set to zero"""
+
+        warning = "Value of linear parameter {} of component {}" \
+            "was set to zero. Changed to value = 1 for fitting."
         for comp in self:
             if comp.active:
                 for parameter in comp.free_parameters:
                     if parameter.value == 0:
                         parameter._set_value(1)
-                        logging.warning("Value of linear parameter " + parameter.name + " of component " +
-                                     comp.name + " was set to zero. Changed to value = 1 for fitting.")
+                        logging.warning(warning.format(
+                            parameter.name, comp.name))
 
-    def _get_constant_term(self):
-        '''Get constant term from model, i.e. b from `expr = ax + b`, if b is fixed.'''
-        # TODO: Support convolution
-        constant_term = 0
+    def _linear_fitting(self, bounded):
+        nonlinear = self._get_nonlinear_components()
+        if nonlinear:
+            raise AttributeError(not_linear_error + str(nonlinear))
+
+        self._check_and_set_linear_parameters_not_zero()
+        self._set_p0()
+        number_of_free_parameters = len(self.p0)
+        assert number_of_free_parameters > 0, \
+            'Model does not contain any free components!'
+
+        signal_axis = self.axis.axis[np.where(self.channel_switches)]
+        comp_data = np.zeros((number_of_free_parameters,) + signal_axis.shape)
+        comp_data_constant_values = np.zeros(
+            (number_of_free_parameters,) + signal_axis.shape)
+        fixed_comp_data = np.zeros(signal_axis.shape)
+        #fixed_comp_data_constant_values = np.zeros(signal_axis.shape)
+
+        def p0_index_from_component(component):
+            return self.free_parameters.index(component.free_parameters[0])
+
+        def p0_index_from_parameter(parameter):
+            return self.free_parameters.index(parameter)
+
+        def _append_component(component):
+            '''The following code works for a model where ax+b/x+c can be
+            multiple components, not only one'''
+            if component.free_parameters:
+                # linear component to fit, with constant part
+                # Constant part of just linear components
+                index = p0_index_from_component(component)
+                if len(component.free_parameters) < 2:
+                    comp_data[index] += component._compute_component() - \
+                        component._compute_constant_term()
+                else:
+                    # Check that this component is based on Expression
+                    assert component._str_expression, \
+                        "Component {} has more than one free parameter, " \
+                        "which is only supported for Expression type " \
+                        "components."
+                    free, fixed = component._separate_fixed_and_free_expression_elements()
+                    for free_parameter in component.free_parameters:
+                        index = p0_index_from_parameter(free_parameter)
+                        comp_data[index] += component._compute_expression_part(
+                            free[free_parameter.name])
+                    fixed_comp_data[:] += component._compute_expression_part(
+                        fixed)
+            else:
+                # No free parameters, so component is a fixed.
+                # Entire value of fixed components
+                fixed_comp_data[:] += component._compute_component()
+
+        def get_parent_twin(parameter):
+            if parameter.twin:
+                return get_parent_twin(parameter.twin)
+            else:
+                return parameter
+
+        def add_twins(parent_comp):
+            'Accounts for situation where twins have been chained'
+            indices = [i for i, x in enumerate(
+                twinned_components_parents) if x == parent_comp]
+            if parent_comp.free_parameters:  # Parent component not fixed
+                for twin in np.array(twinned_components)[indices]:
+                    parent_parameter = get_parent_twin(
+                        twinned_parameters[twinned_components.index(twin)])
+                    index = p0_index_from_parameter(parent_parameter)
+                    if len(component.free_parameters) < 2:
+                        comp_data[index] += twin._compute_component()
+            else:  # Parent component is fixed, so all children are fixed too
+                for twin in np.array(twinned_components)[indices]:
+                    fixed_comp_data[:] += twin._compute_component()
+
+        def append_component(component):
+            'Separate free and constant data for fitting'
+            if component not in twinned_components:
+                _append_component(component)
+                if component in twinned_components_parents:
+                    add_twins(component)
+
+        def top_parent_twin(parameter):
+            if parameter.twin.twin:
+                return top_parent_twin(parameter.twin)
+            else:
+                return parameter.twin
+
+        def calculate_covariance_matrix(A, b):
+            '''Calculate covariance matrix after performing Linear Regression
+
+            Parameters:
+            fit: The resultant fit after performing fitting, same shape as b
+            A: The component matrix fitted against
+            b: The raw data fitted to
+
+            '''
+            n = b.shape[0]
+            k = A.shape[-1]
+            residual = b - (self._fit_coefficients * A).sum(-1)
+
+            residual_dot = np.dot(residual.T, residual)
+            component_dot = np.dot(A.T, A)
+            inverse_component_dot = np.linalg.inv(component_dot)
+
+            covariance = (1 / (n - k)) * np.dot(residual_dot,
+                                                inverse_component_dot)
+            return covariance
+
+        def standard_error_from_covariance(covariance):
+            standard_error = np.sqrt(np.diagonal(covariance))
+            return standard_error
+
+        # Create a list of twinned components and their parents
+        twinned_components_parents = []
+        twinned_parameters_parents = []
+        twinned_components = []
+        twinned_parameters = []
         for comp in self:
-            if comp.active:
-                constant_term += comp.constant_term
-        return constant_term
+            for para in comp.parameters:
+                if para.twin and para._is_linear:
+                    twinned_components.append(comp)
+                    twinned_parameters.append(para)
+                    parent = top_parent_twin(para)
+                    twinned_parameters_parents.append(parent)
+                    twinned_components_parents.append(parent.component)
+        self.twinned_components_parents = twinned_components_parents
+        self.twinned_components = twinned_components
+
+        for component in self:
+            if component.active and component not in twinned_components:
+                append_component(component)
+
+        comp_data = comp_data - comp_data_constant_values  # the linear data
+        self.comp_data_constant_values = comp_data_constant_values
+        y = self.signal()[np.where(self.channel_switches)]
+
+        if self.signal.metadata.Signal.binned is True:
+            y = y / self.signal.axes_manager[-1].scale
+
+        # Later we are subtracting the constant terms from all
+        # components, so must remove constant term from fixed
+        # components here:
+        fixed_values = fixed_comp_data  # - fixed_comp_data_constant_values
+
+        y = y - fixed_values  # - model_constant_term
+
+        if bounded:
+            self.set_boundaries()
+            bounds = self.free_parameters_boundaries
+            # Must scale bounds by current value as bounds refer to
+            # scaling factor
+            new_bounds = ([bmin / value if bmin is not None else -np.inf
+                           for (bmin, bmax), value in zip(bounds, self.p0)],
+                          [bmax / value if bmax is not None else np.inf
+                           for (bmin, bmax), value in zip(bounds, self.p0)])
+
+            output = linear(comp_data.T, y, bounds=new_bounds)
+        else:
+            output = linear(comp_data.T, y)
+        self.comp_data = comp_data
+        self.fit_output = output
+        self._fit_coefficients = output["x"]
+        self.p0 = tuple(
+            [oldp0 * fit_coefficient for oldp0,
+             fit_coefficient in zip(self.p0, self._fit_coefficients)])
+        covariance = calculate_covariance_matrix(comp_data.T, y)
+        self.p_std = self.p0 * standard_error_from_covariance(covariance)
 
     def _errfunc2(self, param, y, weights=None):
         if weights is None:
@@ -940,21 +1102,22 @@ class BaseModel(list):
         fitter : {"leastsq", "mpfit", "odr", "Nelder-Mead",
                  "Powell", "CG", "BFGS", "Newton-CG", "L-BFGS-B", "TNC",
                  "Differential Evolution"}
-            The optimization algorithm used to perform the fitting. Default
-            is "leastsq".
-
+            The optimization algorithm used to perform the fitting. The default
+            is "leastsq" when there are free non-linear parameters and "linear"
+            when the free parameters are all linear.
+                
                 "leastsq" performs least-squares optimization, and supports
                 bounds on parameters.
+
+                "linear" performs least-squares fitting using linear
+                regression. Very fast and supports bounds, but does not
+                allow fitting of non-linear parameters.
 
                 "mpfit" performs least-squares using the Levenberg–Marquardt
                 algorithm and supports bounds on parameters.
 
                 "odr" performs the optimization using the orthogonal distance
                 regression algorithm. It does not support bounds.
-
-                "linear" performs least-squares fitting using linear
-                algebra, and then optimizes it using a linear_lstsq iterative approach
-                similar to the "leastsq" algorithm. Very fast and supports bounds.
 
                 "Nelder-Mead", "Powell", "CG", "BFGS", "Newton-CG", "L-BFGS-B"
                 and "TNC" are wrappers for scipy.optimize.minimize(). Only
@@ -1003,7 +1166,7 @@ class BaseModel(list):
         if fitter is None:
             if self._check_all_active_components_are_linear():
                 fitter = "linear"
-            else: 
+            else:
                 fitter = 'leastsq'
         switch_aap = (update_plot != self._plot_active)
         if switch_aap is True and update_plot is False:
@@ -1186,170 +1349,7 @@ class BaseModel(list):
                 self.fit_output = m
 
             elif fitter == "linear":
-                nonlinear = self._get_nonlinear_components()
-                if nonlinear:
-                    raise AttributeError(not_linear_error + str(nonlinear))
-
-                self._check_and_set_linear_parameters_not_zero()
-                self._set_p0()
-                number_of_free_parameters = len(self.p0)
-                assert number_of_free_parameters > 0, 'Model does not contain any free components!'
-                
-                signal_axis = self.axis.axis[np.where(self.channel_switches)]
-                comp_data = np.zeros((number_of_free_parameters,) + signal_axis.shape)
-                comp_data_constant_values = np.zeros((number_of_free_parameters,) + signal_axis.shape)
-                fixed_comp_data = np.zeros(signal_axis.shape)
-                fixed_comp_data_constant_values = np.zeros(signal_axis.shape)
-
-                def p0_index_from_component(component):
-                    return self.free_parameters.index(component.free_parameters[0])
-
-                def p0_index_from_parameter(parameter):
-                    return self.free_parameters.index(parameter)
-
-                def _append_component(component):
-                    'The following code works for a model where ax+b/x+c can be multiple components, not only one'
-                    if component.free_parameters:
-                        # linear component to fit, with constant part
-                        # Constant part of just linear components
-                        index = p0_index_from_component(component)
-                        comp_data_constant_values[index] += component._compute_constant_term()
-                        if len(component.free_parameters) < 2:
-                            comp_data[index] += component._compute_component()
-                        else:
-                            # Check that this component is based on Expression
-                            assert component._str_expression, \
-                            "Component {} has more than one free parameter, which is only supported for Expression type components."
-                            free, fixed = component._separate_fixed_and_free_expression_elements()
-                            for free_parameter in component.free_parameters:
-                                index = p0_index_from_parameter(free_parameter)
-                                comp_data[index] += component._compute_expression_part(free[free_parameter.name])
-                            fixed_comp_data[:] += component._compute_expression_part(fixed)
-                    else:  
-                        # No free parameters, so component is a fixed.
-                        # Entire value of fixed components
-                        fixed_comp_data[:] += component._compute_component()
-                        fixed_comp_data_constant_values[:] += component._compute_constant_term()
-
-                def get_parent_twin(parameter):
-                    if parameter.twin:
-                        return get_parent_twin(parameter.twin)
-                    else:
-                        return parameter
-
-                def add_twins(comp):
-                    'Accounts for situation where twins have been chained'
-                    indices = [i for i, x in enumerate(twinned_components_parents) if x == comp]
-                    if comp.free_parameters: # Parent component not fixed
-                        # Need to cover case when a double element Expression (a*x**2 + b*x)
-                        # has two other components as children twins
-                        # Currently the function can't decipher the first from the second twin,
-                        # and will enter the data into the first p0 index
-                        for twin in np.array(twinned_components)[indices]:
-                            parent_parameter = get_parent_twin(twinned_parameters[twinned_components.index(twin)])
-                            index = p0_index_from_parameter(parent_parameter)
-                            if len(component.free_parameters) < 2:
-                                comp_data[index] += twin._compute_component()
-                            #recursively_add_twins(twin)
-                    else: # Parent component is fixed, so all children are fixed too
-                        for twin in np.array(twinned_components)[indices]:
-                            fixed_comp_data[:] += twin._compute_component()
-
-                def append_component(component):
-                    'Separate free and constant data for fitting'
-                    if component not in twinned_components:
-                        _append_component(component)
-                        if component in twinned_components_parents:
-                            add_twins(component)
-
-                def top_parent_twin(parameter):
-                    if parameter.twin.twin:
-                        return top_parent_twin(parameter.twin)
-                    else:
-                        return parameter.twin
-
-                def calculate_covariance_matrix(A, b):
-                    '''Calculate covariance matrix after performing Linear Regression
-                    
-                    Parameters:
-                    fit: The resultant fit after performing fitting, same shape as b
-                    A: The component matrix fitted against
-                    b: The raw data fitted to
-
-                    '''
-                    n = b.shape[0]
-                    k = A.shape[-1]
-                    residual = b - (self._fit_coefficients*A).sum(-1)
-
-                    residual_dot = np.dot(residual.T, residual)
-                    component_dot = np.dot(A.T,A)
-                    inverse_component_dot = np.linalg.inv(component_dot)
-                    
-                    covariance = (1/(n-k)) * np.dot(residual_dot, inverse_component_dot)
-                    return covariance
-
-                def standard_error_from_covariance(covariance):
-                    standard_error = np.sqrt(np.diagonal(covariance))
-                    return standard_error
-                    
-                # Create a list of twinned components and their parents
-                twinned_components_parents = []
-                twinned_parameters_parents = []
-                twinned_components = []
-                twinned_parameters = []
-                for comp in self:
-                    for para in comp.parameters:
-                        if para.twin and para._is_linear:
-                            twinned_components.append(comp)
-                            twinned_parameters.append(para)
-                            parent = top_parent_twin(para)
-                            twinned_parameters_parents.append(parent)
-                            twinned_components_parents.append(parent.component)
-                self.twinned_components_parents = twinned_components_parents
-                self.twinned_components = twinned_components
-                # Since each component can have more than one linear parameter, like Expression('a*x+b/x+c'), 
-                # we need to keep track of the free parameters, not just which component we are on
-                for component in self:
-                    if component.active and component not in twinned_components:
-                        append_component(component)
-                    # There is case for fixed components that are twinned to only fixed components, that is not covered here
-
-                comp_data = comp_data - comp_data_constant_values # the linear data
-                model_constant_term = self._get_constant_term() # constant term to subtract from data before fitting
-                self.comp_data_constant_values = comp_data_constant_values
-                y = self.signal()[np.where(self.channel_switches)]
-
-                if self.signal.metadata.Signal.binned == True:
-                    y = y / self.signal.axes_manager[-1].scale
-
-                # Later we are subtracting the constant terms from all
-                # components, so must remove constant term from fixed
-                # components here:
-                fixed_values = fixed_comp_data - fixed_comp_data_constant_values
-
-                y = y - model_constant_term - fixed_values
-
-                if bounded:
-                    self.set_boundaries()
-                    bounds = self.free_parameters_boundaries
-                    # Must scale bounds by current value as bounds refer to
-                    # scaling factor
-                    new_bounds = ([bmin / value if bmin is not None else -np.inf
-                                   for (bmin, bmax), value in zip(bounds, self.p0)],
-                                  [bmax / value if bmax is not None else np.inf
-                                   for (bmin, bmax), value in zip(bounds, self.p0)])
-
-                    output = linear(comp_data.T, y, bounds=new_bounds)
-                else:
-                    output = linear(comp_data.T, y)
-                self.comp_data = comp_data
-                self.fit_output = output
-                self._fit_coefficients = output["x"]
-                self.p0 = tuple([oldp0 * fit_coefficient for oldp0,
-                                 fit_coefficient in zip(self.p0, self._fit_coefficients)])
-                covariance = calculate_covariance_matrix(comp_data.T, y)
-                self.p_std = self.p0*standard_error_from_covariance(covariance)
-
+                self._linear_fitting(bounded)
             else:
                 # General optimizers
                 # Least squares or maximum likelihood
