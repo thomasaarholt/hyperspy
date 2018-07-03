@@ -1183,7 +1183,8 @@ class Component(t.HasTraits):
 
     @property
     def is_linear(self):
-        "Loops through the components free parameters, checks that they are linear"
+        """Loops through the components free parameters,
+        checks that they are linear"""
         linear = True
         for para in self.free_parameters:
             if not para._is_linear:
@@ -1192,19 +1193,14 @@ class Component(t.HasTraits):
 
     @property
     def constant_term(self):
-        "Get value of the constant term of the component. Returns 0 for most components."
+        """Get value of the constant term of the component.
+        Returns 0 for most components."""
         return 0
-    
+
     @property
     def constant_parameters(self):
         "List all parameters which have a non-signal-axis-dependent parameter"
         return self._constant_parameters
-
-    @property
-    def _free_offset_parameter(self):
-        """Attribute containing any free parameter that acts as an offset
-        Needs to be subtracted once from the model as it is added twice"""
-        return None
 
     def _check_only_one_linear_parameter(self):
         """
@@ -1223,7 +1219,8 @@ class Component(t.HasTraits):
         model = self.model
         signal_axis = model.axis.axis[np.where(self.model.channel_switches)]
         if model.convolved and self.convolved:
-            data = self._convolve(self.function(model.convolution_axis), model=model)
+            data = self._convolve(
+                self.function(model.convolution_axis), model=model)
         else:
             not_convolved = self.function(signal_axis)
             data = not_convolved
@@ -1239,22 +1236,16 @@ class Component(t.HasTraits):
             data = not_convolved
         return data
 
-    def _compute_free_offset_parameter_value(self):
-        model = self.model
-        if model.convolved and self.convolved:
-            offset = self._convolve(self._free_offset_parameter.value, model=model)
-        else:
-            offset = self._free_offset_parameter.value
-        return offset
-
     def _convolve(self, to_convolve, model=None):
         '''Convolve component with model convolution axis
-        
+
         Multiply by np.ones in order to handle constant case - has no effect on
         the large'''
-        if model == None:
+        if model is None:
             model = self.model
         convolved = np.convolve(
-                to_convolve * np.ones(model.convolution_axis.shape), model.low_loss(model.axes_manager), mode="valid")
+                to_convolve * np.ones(model.convolution_axis.shape), 
+                model.low_loss(model.axes_manager), mode="valid")
         convolved = convolved[np.where(model.channel_switches)]
         return convolved
+    

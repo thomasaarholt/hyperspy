@@ -245,16 +245,6 @@ class Expression(Component):
                 constant_expr = constant_expr.subs(para.name, para.value)
         return float(constant_expr)
 
-    @property
-    def _free_offset_parameter(self):
-        "Returns any free parameter that act as an offset"
-        offset_parameter = None
-        for i, para in enumerate(self.parameters):
-            symbol = self._parameter_strings[i]
-            if para.free and check_if_parameter_is_offset(self._str_expression, symbol):
-                offset_parameter = para
-        return offset_parameter
-
     def _separate_fixed_and_free_expression_elements(self):
         expr = self._str_expression
         ex = sympy.sympify(expr)

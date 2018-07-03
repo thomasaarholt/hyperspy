@@ -112,11 +112,3 @@ class Offset(Component):
             return 0
         else:
             return self.offset.value
-
-    @property
-    def _free_offset_parameter(self):
-        "Attribute containing any free parameter that acts as an offset"
-        if self.offset.free:
-            return self.offset
-        else:
-            return None
