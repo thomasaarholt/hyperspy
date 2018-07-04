@@ -1014,7 +1014,7 @@ class Component(t.HasTraits):
         axes = [ax.axis for ax in self.model.axes_manager.signal_axes]
         mesh = np.meshgrid(*axes)
         component_array = self.function(*mesh)
-        return component_array[self.model.channel_switches]
+        return component_array[np.where(self.model.channel_switches)]
 
     def _component2plot(self, axes_manager, out_of_range2nans=True):
         old_axes_manager = None
@@ -1218,13 +1218,14 @@ class Component(t.HasTraits):
 
     def _compute_constant_term(self):
         model = self.model
-        signal_shape = model.axes_manager.signal_shape[::-1]
         if model.convolved and self.convolved:
-            data = self._convolve(self.constant_term, model=model)
+            convolved = self._convolve(self.constant_term, model=model)
+            data = convolved[np.where(model.channel_switches)]
         else:
+            signal_shape = np.prod(model.channel_switches.shape)
             not_convolved = self.constant_term * np.ones(signal_shape)
             data = not_convolved
-        return data[np.where(model.channel_switches)]
+        return data
 
     def _convolve(self, to_convolve, model=None):
         '''Convolve component with model convolution axis

@@ -263,7 +263,7 @@ class Expression(Component):
 
     def _compute_expression_part(self, function):
         model = self.model
-        signal_shape = model.axes_manager.signal_shape[::-1]
+        signal_shape = model.channel_switches.shape
         if model.convolved and self.convolved:
             data = self._convolve(function(model.convolution_axis), model=model)
         else:
