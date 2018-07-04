@@ -262,11 +262,12 @@ class Expression(Component):
 
     def _compute_expression_part(self, function):
         model = self.model
+        signal_shape = model.axes_manager.signal_shape[::-1]
         if model.convolved and self.convolved:
             data = self._convolve(function(model.convolution_axis), model=model)
         else:
-            axes = [ax.axis for ax in model.axes_manager._axes]
-            data = function(**axes)
+            axes = [ax.axis for ax in model.axes_manager.signal_axes]
+            data = np.ones(signal_shape)*function(*axes)
         return data[np.where(model.channel_switches)]
 
 def check_parameter_linearity(expr, name):

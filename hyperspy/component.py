@@ -1011,8 +1011,8 @@ class Component(t.HasTraits):
         -------
         numpy array
         """
-        axes = [ax.axis for ax in model.axes_manager._axes]
-        component_array = self.function(**axes)
+        axes = [ax.axis for ax in self.axes_manager.signal_axes]
+        component_array = self.function(*axes)
         return component_array[self.model.channel_switches]
 
     def _component2plot(self, axes_manager, out_of_range2nans=True):
@@ -1209,14 +1209,14 @@ class Component(t.HasTraits):
             data = self._convolve(
                 self.function(model.convolution_axis), model=model)
         else:
-            axes = [ax.axis for ax in model.axes_manager._axes]
+            axes = [ax.axis for ax in model.axes_manager.signal_axes]
             not_convolved = self.function(*axes)
             data = not_convolved
         return data[np.where(model.channel_switches)]
 
     def _compute_constant_term(self):
         model = self.model
-        signal_shape = model.signal.data.shape
+        signal_shape = model.axes_manager.signal_shape[::-1]
         if model.convolved and self.convolved:
             data = self._convolve(self.constant_term, model=model)
         else:

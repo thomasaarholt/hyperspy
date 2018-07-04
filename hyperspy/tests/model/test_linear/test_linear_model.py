@@ -86,7 +86,6 @@ class TestMultifit:
         np.testing.assert_array_almost_equal(self.m[0].A.map['values'],
                                              [4., 4.])
 
-
 class TestLinearFitting:
     def setup_method(self, method):
         self.s = EDS_SEM_Spectrum().isig[5.0:15.0]
