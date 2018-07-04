@@ -889,13 +889,13 @@ class BaseModel(list):
         number_of_free_parameters = len(self.p0)
         assert number_of_free_parameters > 0, \
             'Model does not contain any free components!'
-
-        signal_axis = self.axis.axis[np.where(self.channel_switches)]
-        comp_data = np.zeros((number_of_free_parameters,) + signal_axis.shape)
+        
+        signal_shape = tuple((np.prod(self.channel_switches.shape),))
+        
+        comp_data = np.zeros((number_of_free_parameters,) + signal_shape)
         comp_data_constant_values = np.zeros(
-            (number_of_free_parameters,) + signal_axis.shape)
-        fixed_comp_data = np.zeros(signal_axis.shape)
-        #fixed_comp_data_constant_values = np.zeros(signal_axis.shape)
+            (number_of_free_parameters,) + signal_shape)
+        fixed_comp_data = np.zeros(signal_shape)
 
         def p0_index_from_component(component):
             return self.free_parameters.index(component.free_parameters[0])
@@ -911,8 +911,10 @@ class BaseModel(list):
                 # Constant part of just linear components
                 index = p0_index_from_component(component)
                 if len(component.free_parameters) < 2:
-                    comp_data[index] += component._compute_component() - \
-                        component._compute_constant_term()
+                    COMP = component._compute_component()
+                    CONST = component._compute_constant_term()
+                    comp_data[index] += COMP - CONST
+                        
                 else:
                     # Check that this component is based on Expression
                     assert component._str_expression, \
@@ -1017,12 +1019,11 @@ class BaseModel(list):
         if self.signal.metadata.Signal.binned is True:
             y = y / self.signal.axes_manager[-1].scale
 
-        # Later we are subtracting the constant terms from all
-        # components, so must remove constant term from fixed
-        # components here:
-        fixed_values = fixed_comp_data  # - fixed_comp_data_constant_values
+        y = y - fixed_comp_data  # - model_constant_term
 
-        y = y - fixed_values  # - model_constant_term
+        comp_data_shape = comp_data.shape
+        y = y.flatten()
+        comp_data = comp_data.reshape((comp_data_shape[0],) +  y.shape)
 
         if bounded:
             self.set_boundaries()
@@ -1037,7 +1038,8 @@ class BaseModel(list):
             output = linear(comp_data.T, y, bounds=new_bounds)
         else:
             output = linear(comp_data.T, y)
-        self.comp_data = comp_data
+            
+        self.comp_data = comp_data.reshape(comp_data_shape)
         self.fit_output = output
         self._fit_coefficients = output["x"]
         self.p0 = tuple(
