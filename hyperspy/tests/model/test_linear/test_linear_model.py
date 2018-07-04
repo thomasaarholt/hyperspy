@@ -5,7 +5,9 @@ import pytest
 
 from hyperspy.misc.eels.eelsdb import eelsdb
 from hyperspy._signals.signal1d import Signal1D
+from hyperspy._signals.signal2d import Signal2D
 from hyperspy._components.gaussian import Gaussian
+from hyperspy._components.gaussian2d import Gaussian2D
 from hyperspy._components.power_law import PowerLaw
 from hyperspy._components.expression import Expression
 from hyperspy._components.offset import Offset
@@ -178,3 +180,78 @@ class TestLinearEELSFitting:
     #     m.fit('linear')
     #     data2 = m.as_signal().data
     #     np.testing.assert_almost_equal(data1, data2)
+
+class TestLinearModel2D:
+    def setup_method(self, method):
+        self.X, self.Y = np.arange(0,100), np.arange(0,50)
+        self.mesh = np.meshgrid(self.X,self.Y)
+
+    def test_model2D_one_component(self):
+        G1 = Gaussian2D(30, 5.0, 4.0, 50, 25)
+
+        data = G1.function(*self.mesh)
+        s = Signal2D(data)
+        m = s.create_model()
+        m.append(G1)
+        G1.sigma_x.value = 5
+        G1.sigma_y.value = 4
+        G1.centre_x.value = 50
+        G1.centre_y.value = 25
+
+        for para in G1.free_parameters[1:]:
+            para.free = False     
+
+        m.fit('linear')
+        diff = (s - m.as_signal(show_progressbar=False))
+        np.testing.assert_almost_equal(diff.data.sum(), 0.0, decimal=2)
+        assert m.p_std[0] == 0.
+
+    def test_model2D_two_components(self):
+        G1 = Gaussian2D(30, 5.0, 4.0, 50, 25)
+        G2 = Gaussian2D(10, 5.0, 4.0, 60, 30)
+
+        data = G1.function(*self.mesh) + G2.function(*self.mesh)
+        s = Signal2D(data)
+        m = s.create_model()
+        m.append(G1)
+        m.append(G2)
+
+        G1.sigma_x.value = 5
+        G1.sigma_y.value = 4
+        G1.centre_x.value = 50
+        G1.centre_y.value = 25
+
+        for para in G1.free_parameters[1:]:
+            para.free = False     
+        
+        G2.sigma_x.value = 5
+        G2.sigma_y.value = 4
+        G2.centre_x.value = 60
+        G2.centre_y.value = 30
+
+        for para in G2.free_parameters[1:]:
+            para.free = False    
+
+        m.fit('linear')
+        diff = (s - m.as_signal(show_progressbar=False))
+        np.testing.assert_almost_equal(diff.data.sum(), 0.0, decimal=2)
+        np.testing.assert_almost_equal(m.p_std, [0.0, 0.0], decimal=2)
+
+    def test_model2D_polyexpression(self):
+        poly = "a*x**2 + b*x - c*y**2 + d*y + e"
+        P = Expression(poly, 'poly')
+        P.a.value = 6
+        P.b.value = 5
+        P.c.value = 4
+        P.d.value = 3
+        P.e.value = 2
+        
+        data = P.function(*self.mesh)# + G2.function(*mesh)
+        s = Signal2D(data)
+
+        m = s.create_model()
+        m.append(P)
+        m.fit('linear')
+        diff = (s - m.as_signal(show_progressbar=False))
+        np.testing.assert_almost_equal(diff.data.sum(), 0.0, decimal=2)
+        np.testing.assert_almost_equal(m.p_std, 0.0, decimal=2)
