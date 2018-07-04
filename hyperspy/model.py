@@ -877,6 +877,10 @@ class BaseModel(list):
 
     def _linear_fitting(self, bounded):
         nonlinear = self._get_nonlinear_components()
+        not_linear_error = "Not all components are linear. Fit with a " \
+                    "different fitter or set non-linear " \
+                    "`parameters.free = False`. These " \
+                    "components are nonlinear:"
         if nonlinear:
             raise AttributeError(not_linear_error + str(nonlinear))
 
@@ -1258,11 +1262,6 @@ class BaseModel(list):
                     method)
             args = (self.signal()[np.where(self.channel_switches)],
                     weights)
-
-            not_linear_error = "Not all components are linear. Fit with a " + \
-                               "different fitter or set non-linear " + \
-                               "`parameters.free = False`. These " + \
-                               "components are nonlinear:"
 
             # Least squares "dedicated" fitters
             if fitter == "leastsq":
