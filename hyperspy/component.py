@@ -1011,9 +1011,9 @@ class Component(t.HasTraits):
         -------
         numpy array
         """
-        axis = self.model.axis.axis[self.model.channel_switches]
-        component_array = self.function(axis)
-        return component_array
+        axes = [ax.axis for ax in model.axes_manager._axes]
+        component_array = self.function(**axes)
+        return component_array[self.model.channel_switches]
 
     def _component2plot(self, axes_manager, out_of_range2nans=True):
         old_axes_manager = None
@@ -1202,39 +1202,27 @@ class Component(t.HasTraits):
         "List all parameters which have a non-signal-axis-dependent parameter"
         return self._constant_parameters
 
-    def _check_only_one_linear_parameter(self):
-        """
-        Linear fitters can only work with one linear parameter per component.
-        Checks that this is the case for a given component.
-        """
-        n_free = 0
-        for para in self.free_parameters:
-            if para._is_linear:
-                n_free += 1
-        if n_free > 1:
-            raise AttributeError("Component " + str(self) +
-                                 " has more than one linear component.")
-
     def _compute_component(self):
         model = self.model
-        signal_axis = model.axis.axis[np.where(self.model.channel_switches)]
         if model.convolved and self.convolved:
+            # TODO: Model2D doesn't support a 2D convolution axis (yet)
             data = self._convolve(
                 self.function(model.convolution_axis), model=model)
         else:
-            not_convolved = self.function(signal_axis)
+            axes = [ax.axis for ax in model.axes_manager._axes]
+            not_convolved = self.function(*axes)
             data = not_convolved
-        return data
+        return data[np.where(model.channel_switches)]
 
     def _compute_constant_term(self):
         model = self.model
-        signal_axis = model.axis.axis[np.where(model.channel_switches)]
+        signal_shape = model.signal.data.shape
         if model.convolved and self.convolved:
             data = self._convolve(self.constant_term, model=model)
         else:
-            not_convolved = self.constant_term * np.ones(signal_axis.shape)
+            not_convolved = self.constant_term * np.ones(signal_shape)
             data = not_convolved
-        return data
+        return data[np.where(model.channel_switches)]
 
     def _convolve(self, to_convolve, model=None):
         '''Convolve component with model convolution axis
@@ -1246,6 +1234,6 @@ class Component(t.HasTraits):
         convolved = np.convolve(
                 to_convolve * np.ones(model.convolution_axis.shape), 
                 model.low_loss(model.axes_manager), mode="valid")
-        convolved = convolved[np.where(model.channel_switches)]
+        convolved = convolved#[np.where(model.channel_switches)]
         return convolved
     

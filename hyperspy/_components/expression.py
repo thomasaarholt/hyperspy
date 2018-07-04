@@ -265,8 +265,9 @@ class Expression(Component):
         if model.convolved and self.convolved:
             data = self._convolve(function(model.convolution_axis), model=model)
         else:
-            data = function(model.axis.axis[np.where(model.channel_switches)])
-        return data
+            axes = [ax.axis for ax in model.axes_manager._axes]
+            data = function(**axes)
+        return data[np.where(model.channel_switches)]
 
 def check_parameter_linearity(expr, name):
     "Check whether expression is linear for a given parameter"
