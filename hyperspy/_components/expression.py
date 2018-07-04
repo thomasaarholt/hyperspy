@@ -267,7 +267,8 @@ class Expression(Component):
             data = self._convolve(function(model.convolution_axis), model=model)
         else:
             axes = [ax.axis for ax in model.axes_manager.signal_axes]
-            data = np.ones(signal_shape)*function(*axes)
+            mesh = np.meshgrid(*axes)
+            data = np.ones(signal_shape)*function(*mesh)
         return data[np.where(model.channel_switches)]
 
 def check_parameter_linearity(expr, name):
