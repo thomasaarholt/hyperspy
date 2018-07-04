@@ -250,14 +250,15 @@ class Expression(Component):
         ex = sympy.sympify(expr)
         remaining_elements = ex.copy()
         pseudo_components = {}
+        variables = ("x", "y") if self._is2D else ("x", )
         for para in self.free_parameters:
             element = ex.as_independent(para.name)[-1]
             remaining_elements -= element
-            pseudo_components[para.name] = lambdify('x', 
+            pseudo_components[para.name] = lambdify(variables, 
                 element.subs(para.name, para.value), modules='numpy')
         fixed_parameters = list(set(self.parameters) - set(self.free_parameters))
         fixed_parameter_values = [(para.name, para.value) for para in fixed_parameters]
-        fixed_part = lambdify('x', remaining_elements.subs(fixed_parameter_values), modules='numpy')
+        fixed_part = lambdify(variables, remaining_elements.subs(fixed_parameter_values), modules='numpy')
         return pseudo_components, fixed_part
 
     def _compute_expression_part(self, function):
