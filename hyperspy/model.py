@@ -866,7 +866,7 @@ class BaseModel(list):
         set to zero"""
 
         warning = "Value of linear parameter {} of component {}" \
-            "was set to zero. Changed to value = 1 for fitting."
+            " was set to zero. Changed to value = 1 for fitting."
         for comp in self:
             if comp.active:
                 for parameter in comp.free_parameters:
