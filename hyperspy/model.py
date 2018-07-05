@@ -889,13 +889,17 @@ class BaseModel(list):
         number_of_free_parameters = len(self.p0)
         assert number_of_free_parameters > 0, \
             'Model does not contain any free components!'
+        # TODO: Need a better way of calculating the shape than this... 
+        axes = [ax.axis for ax in self.axes_manager.signal_axes]
+        mesh = np.meshgrid(*axes)
+        mesh = [me[np.where(self.channel_switches)] for me in mesh]
+        channels_signal_shape = mesh[0].shape
+        #channels_signal_shape = tuple((np.prod(self.channel_switches.shape),))
         
-        signal_shape = tuple((np.prod(self.channel_switches.shape),))
-        
-        comp_data = np.zeros((number_of_free_parameters,) + signal_shape)
+        comp_data = np.zeros((number_of_free_parameters,) + channels_signal_shape)
         comp_data_constant_values = np.zeros(
-            (number_of_free_parameters,) + signal_shape)
-        fixed_comp_data = np.zeros(signal_shape)
+            (number_of_free_parameters,) + channels_signal_shape)
+        fixed_comp_data = np.zeros(channels_signal_shape)
 
         def p0_index_from_component(component):
             return self.free_parameters.index(component.free_parameters[0])
@@ -931,6 +935,8 @@ class BaseModel(list):
             else:
                 # No free parameters, so component is a fixed.
                 # Entire value of fixed components
+                print(fixed_comp_data.shape)
+                print(component._compute_component().shape)
                 fixed_comp_data[:] += component._compute_component()
 
         def get_parent_twin(parameter):

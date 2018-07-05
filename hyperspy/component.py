@@ -1220,12 +1220,14 @@ class Component(t.HasTraits):
         model = self.model
         if model.convolved and self.convolved:
             convolved = self._convolve(self.constant_term, model=model)
-            data = convolved[np.where(model.channel_switches)]
+            data = convolved
         else:
-            signal_shape = np.prod(model.channel_switches.shape)
+            # TODO: Need a better way of calculating the shape than this... 
+            signal_shape = model.axes_manager.signal_shape[::-1]
+            #signal_shape = np.prod(model.channel_switches.shape)
             not_convolved = self.constant_term * np.ones(signal_shape)
             data = not_convolved
-        return data
+        return data[np.where(model.channel_switches)]
 
     def _convolve(self, to_convolve, model=None):
         '''Convolve component with model convolution axis
