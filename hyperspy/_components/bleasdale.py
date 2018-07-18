@@ -43,6 +43,7 @@ class Bleasdale(Expression):
     
     For :math:`(a+b\cdot x)\leq0`, the component will be set to 0.
     """
+<<<<<<< HEAD
     
     def __init__(self, a=1., b=1., c=1., module="numexpr", **kwargs):
         super(Bleasdale, self).__init__(
@@ -55,6 +56,28 @@ class Bleasdale(Expression):
             autodoc=False,
             compute_gradients=False,
             **kwargs)
+=======
+
+    def __init__(self, a=1, b=1, c=1):
+        # Define the parameters
+        Component.__init__(self, ('a', 'b', 'c'))
+        # Define the name of the component
+        self.a.value = a
+        self.b.value = b
+        self.c.value = c
+
+    def function(self, x, multi=False):
+        if multi:
+            a = self.a.map['values'][...,None]
+            b = self.b.map['values'][...,None]
+            c = self.c.map['values'][...,None]
+        else:
+            a = self.a.value
+            b = self.b.value
+            c = self.c.value
+        abx = (a + b * x)
+        return np.where(abx > 0., abx ** (-1 / c), 0.)
+>>>>>>> Make most components multi-compatible
 
     def grad_a(self, x):
         """

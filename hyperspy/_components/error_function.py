@@ -65,6 +65,10 @@ class Erf(Expression):
             **kwargs,
         )
 
+        self.A.value = A
+        self.sigma.value = sigma
+        self.origin.value = origin
+        
         # Boundaries
         self.A.bmin = 0.
 

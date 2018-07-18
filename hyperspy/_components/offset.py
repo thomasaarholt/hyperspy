@@ -112,8 +112,6 @@ class Offset(Component):
             self.offset.map['is_set'][:] = True
             self.fetch_stored_values()
             return True
-<<<<<<< HEAD
-<<<<<<< HEAD
 
     def function_nd(self, axis):
         """%s
@@ -128,28 +126,17 @@ class Offset(Component):
         return self._function(x, o)
 
     function_nd.__doc__ %= FUNCTION_ND_DOCSTRING
-=======
-        
-=======
 
-<<<<<<< HEAD
->>>>>>> Linear model fitting functions
-    @property
-    def constant_term(self):
-=======
     def get_constant_term(self, multi=False):
->>>>>>> Squash: Linear Model and EELS fitting
         "Get value of constant term of component"
         # First get currently constant parameters
         if self.offset.free:
             return 0
         else:
-<<<<<<< HEAD
-            return self.offset.value
-<<<<<<< HEAD
->>>>>>> Linearity attribute to parameters
-=======
-
+            if multi:
+                return self.offset.map['values']
+            else:
+                return self.offset.value
     @property
     def _free_offset_parameter(self):
         "Attribute containing any free parameter that acts as an offset"
@@ -157,10 +144,3 @@ class Offset(Component):
             return self.offset
         else:
             return None
->>>>>>> Linear model fitting functions
-=======
-            if multi:
-                return self.offset.map['values']
-            else:
-                return self.offset.value
->>>>>>> Squash: Linear Model and EELS fitting
