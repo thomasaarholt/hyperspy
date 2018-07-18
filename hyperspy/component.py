@@ -758,7 +758,6 @@ class Component(t.HasTraits):
         self._slicing_whitelist = {'_active_array': 'inav'}
         self._slicing_order = ('active', 'active_is_multidimensional',
                                '_active_array',)
-        self._constant_parameters = []
 
     _name = ''
     _active_is_multidimensional = False
@@ -1202,11 +1201,6 @@ class Component(t.HasTraits):
             return np.zeros(nav_shape + sig_dim*(1,))
         else:
             return 0
-
-    @property
-    def constant_parameters(self):
-        "List all parameters which have a non-signal-axis-dependent parameter"
-        return self._constant_parameters
 
     def _compute_component(self, multi=False):
         model = self.model
