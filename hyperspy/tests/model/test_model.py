@@ -1069,19 +1069,6 @@ class TestMultifit:
         np.testing.assert_array_almost_equal(self.m[0].A.map['values'],
                                              [4., 4.])
 
-    def test_bounded_snapping_lsq_linear(self):
-        m = self.m
-        m[0].A.free = True
-        m[0].r.free = False
-
-        m.signal.data *= 2.
-        m[0].A.value = 2.
-        m[0].r.value = 3.
-        m[0].r.assign_current_value_to_all()
-        m.multifit(fitter='linear', bounded=True, show_progressbar=None)
-        np.testing.assert_array_almost_equal(self.m[0].A.map['values'],
-                                             [4., 4.])
-
     def test_None_iterpath(self):
         'To be removed with hyperspy 2.0, where serpentine is default.'
         with pytest.warns(VisibleDeprecationWarning):

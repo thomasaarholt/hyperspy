@@ -65,6 +65,14 @@ class Offset(Component):
     def _function(self, x, o):
         return np.ones_like(x) * o
 
+    def function(self, x, multi=False):
+        "Linear fitting TODO remove this before merge"
+        if multi:
+            o = self.offset.map['values'][...,None]
+        else:
+            o = self.offset.value
+        return np.ones((len(x))) * o
+
     @staticmethod
     def grad_offset(x):
         return np.ones_like(x)

@@ -133,9 +133,9 @@ class Gaussian(Expression):
     def function(self, x, multi=False):
         "This function is only used for linear multifit. Should ideally be replaced in Expression. the non-multifit part can be completely removed."
         if multi:
-            A = self.A.map['values'][...,None]
-            s = self.sigma.map['values'][...,None]
-            c = self.centre.map['values'][...,None]
+            A = self.A.map['values'][..., None]
+            s = self.sigma.map['values'][..., None]
+            c = self.centre.map['values'][..., None]
         else:
             A = self.A.value
             s = self.sigma.value
