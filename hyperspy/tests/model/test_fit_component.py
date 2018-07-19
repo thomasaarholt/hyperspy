@@ -45,7 +45,7 @@ class TestFitOneComponent:
 
         g1 = Gaussian()
         m.append(g1)
-        m.fit_component(g1, signal_range=(4000, 6000))
+        m.fit_component(g1, signal_range=(4000, 6000), fitter='leastsq')
         np.testing.assert_allclose(self.g.function(axis),
                                    g1.function(axis),
                                    rtol=self.rtol,
@@ -53,7 +53,7 @@ class TestFitOneComponent:
 
     def test_component_not_in_model(self):
         with pytest.raises(ValueError):
-            self.model.fit_component(self.g)
+            self.model.fit_component(self.g, fitter='leastsq')
 
 
 class TestFitSeveralComponent:
@@ -107,7 +107,7 @@ class TestFitSeveralComponent:
         g3 = self.g3
         g2.active = True
         g3.active = False
-        m.fit_component(g1, signal_range=(4500, 5200), fit_independent=True)
+        m.fit_component(g1, signal_range=(4500, 5200), fit_independent=True, fitter='leastsq')
         np.testing.assert_allclose(self.gs1.function(axis),
                                    g1.function(axis),
                                    rtol=self.rtol,
@@ -124,7 +124,7 @@ class TestFitSeveralComponent:
         g3 = self.g3
         g2.A.free = False
         g2.sigma.free = False
-        m.fit_component(g1, signal_range=(4500, 5200))
+        m.fit_component(g1, signal_range=(4500, 5200), fitter='leastsq')
         np.testing.assert_allclose(self.gs1.function(axis),
                                    g1.function(axis),
                                    rtol=self.rtol,
@@ -147,9 +147,9 @@ class TestFitSeveralComponent:
         g1 = self.g1
         g2 = self.g2
         g3 = self.g3
-        m.fit_component(g1, signal_range=(4500, 5200))
-        m.fit_component(g2, signal_range=(1500, 2200))
-        m.fit_component(g3, signal_range=(5800, 6150))
+        m.fit_component(g1, signal_range=(4500, 5200), fitter='leastsq')
+        m.fit_component(g2, signal_range=(1500, 2200), fitter='leastsq')
+        m.fit_component(g3, signal_range=(5800, 6150), fitter='leastsq')
         np.testing.assert_allclose(self.model.signal.data,
                                    m(),
                                    rtol=self.rtol,

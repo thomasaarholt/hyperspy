@@ -343,7 +343,7 @@ def test_multiprocessed():
 
     shape = (7, 15)
 
-    model.fit()
+    model.fit(fitter='leastsq')
     samf = model.create_samfire(workers=N_WORKERS, ipyparallel=False)
     samf.plot_every = np.nan
     samf.strategies[0].radii = 1.

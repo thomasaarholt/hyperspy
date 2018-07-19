@@ -201,7 +201,7 @@ class Expression(Component):
                 name, sympy.latex(_parse_substitutions(expression)))
 
         for para in self.parameters:
-            para._is_linear = check_parameter_linearity(expression, para.name)
+            para._is_linear = check_parameter_linearity(self._parsed_expr, para.name)
 
     def compile_function(self, module="numpy", position=False):
 <<<<<<< HEAD
@@ -221,7 +221,11 @@ class Expression(Component):
 =======
 >>>>>>> Squash: Linear Model and EELS fitting
         expr = _parse_substitutions(self._str_expression)
+<<<<<<< HEAD
 
+=======
+        self._parsed_expr = expr
+>>>>>>> Set explicit fit('leastsq') on other tests, fix failing tests
         # Extract x
         x = [symbol for symbol in expr.free_symbols if symbol.name == "x"]
         if not x: # Expression is just a parameter, no x -> Offset

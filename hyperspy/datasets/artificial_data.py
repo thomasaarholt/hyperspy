@@ -270,6 +270,7 @@ def get_core_loss_eels_model(add_powerlaw=False):
     """
     s = get_core_loss_eels_signal(add_powerlaw=add_powerlaw)
     m = s.create_model(auto_background=False, GOS='hydrogenic')
+    m.fit(fitter='leastsq')
     return m
 
 
