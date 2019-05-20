@@ -18,6 +18,7 @@
 
 import numpy as np
 import dask.array as da
+import sympy as sp
 
 
 def linear_regression(y, comp_data, bounded=False):
@@ -80,10 +81,17 @@ def get_top_parent_twin(parameter):
         return parameter
 
 
-def get_full_twin_function(parameter):
+def _substitute_twin_function(parameter):
+    'Uses sympy to substitute the twin expression of a parent component'
+    twin_parameter = parameter.twin
+    exp = sp.sympify(parameter.twin_function_expr)
+    return twin_parameter, exp.subs('x', twin_parameter.twin_function_expr)
+
+
+def get_substituted_twin_function(parameter):
     'If there is chaining of twins, get the full twin_function'
-    func = twin_function
-    if parameter.twin:
-        return get_top_parent_twin(parameter.twin)
-    else:
-        return parameter
+    parent = parameter.twin
+    subs_func = parameter.twin_function_expr
+    while parent.twin:
+        parent, subs_func = _substitute_twin_function(parameter)
+    return subs_func
