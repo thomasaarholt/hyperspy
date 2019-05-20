@@ -20,7 +20,7 @@ import numpy as np
 import dask.array as da
 
 
-def linear_regression(y, comp_data):
+def linear_regression(y, comp_data, bounded=False):
     '''
     Performs linear regression on single pixels as well
     as multidimensional arrays

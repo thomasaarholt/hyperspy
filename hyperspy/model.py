@@ -27,7 +27,8 @@ import numpy as np
 import scipy
 import scipy.odr as odr
 from scipy.optimize import (leastsq, least_squares,
-                            minimize, differential_evolution)
+                            minimize, lsq_linear, 
+                            differential_evolution)
 from scipy.linalg import svd
 from contextlib import contextmanager
 
@@ -1095,7 +1096,7 @@ class BaseModel(list):
                 np.dot(res_dot[index], inv_fit_dot[index])
         return covariance
 
-    def _linear_fitting(self, multifit=False):
+    def _linear_fitting(self, multifit=False, bounds=False):
         'Parent method for fitting using multivariate linear regression'
         nonlinear = self._get_nonlinear_parameters()
         not_linear_error = "Not all free parameters are linear. " \
@@ -1105,6 +1106,9 @@ class BaseModel(list):
             "parameters are nonlinear:"
         if nonlinear:
             raise AttributeError(not_linear_error + str(nonlinear))
+
+        if bounds:
+            multifit = True
 
         self._is_multifit = multifit
         self._constant_ll = self._check_if_ll_constant()
@@ -1171,8 +1175,9 @@ class BaseModel(list):
                     y, self.comp_data)
             else:
                 for index in np.ndindex(nav_shape):
+                    # SET BOUNDS HERE ON A PIXEL BY PIXEL BASIS
                     self.coefficient_array[index] = linear_regression(
-                        y[index], self.comp_data[index])
+                        y[index], self.comp_data[index], bounds=bounds)
             covariance = self.calculate_covariance_matrix()
             standard_error = standard_error_from_covariance(covariance)
             j = 0 # counter to skip any zero-components
@@ -1511,7 +1516,7 @@ class BaseModel(list):
                 self.fit_output = m
 
             elif fitter == "linear":
-                self._linear_fitting(bounded)
+                self._linear_fitting(bounded=bounded)
             else:
                 # General optimizers
                 # Least squares or maximum likelihood
