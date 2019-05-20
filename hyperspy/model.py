@@ -1129,7 +1129,7 @@ class BaseModel(list):
         if bounded:
             # The current bounded fitting algorithm cannot do all nav pixels simultanously
             self._compute_nav_space_components = self._is_multifit
-            self._uniform_comp_map_vals = False
+            self._uniform_comp_map_vals = False # should be able to make this True
 
         n_free_para = len(self.free_parameters)
         assert n_free_para > 0, \
@@ -1183,9 +1183,10 @@ class BaseModel(list):
                     # SET BOUNDS HERE ON A PIXEL BY PIXEL BASIS
                     bounds = get_free_parameter_bounds_scaled(
                         self) if bounded else False
+                    # CURRENTLY COMP_DATA IS NAV SPACE'D, WHICH IS UNECESSARY
                     self.coefficient_array[index] = linear_regression(
                         y[index], self.comp_data[index], bounds=bounds)
-            covariance = self.calculate_covariance_matrix()
+            covariance = self.calculate_covariance_matrix() # PROB NEED TO DEAL WITH THIS AND LSQ_LINEAR
             standard_error = standard_error_from_covariance(covariance)
             j = 0  # counter to skip any zero-components
             for i, para in enumerate(self.free_parameters):
