@@ -27,8 +27,7 @@ import numpy as np
 import scipy
 import scipy.odr as odr
 from scipy.optimize import (leastsq, least_squares,
-                            minimize, lsq_linear, 
-                            differential_evolution)
+                            minimize, differential_evolution)
 from scipy.linalg import svd
 from contextlib import contextmanager
 
@@ -46,11 +45,12 @@ from hyperspy.misc.utils import (slugify, shorten_name, stash_active_state,
                                  dummy_context_manager)
 from hyperspy.misc.slicing import copy_slice_from_whitelist
 from hyperspy.misc.model_tools import (linear_regression, get_top_parent_twin,
-                                       standard_error_from_covariance)
+                                       standard_error_from_covariance, get_free_parameter_bounds_scaled)
 from hyperspy.events import Events, Event, EventSuppressor
 import warnings
 from hyperspy.exceptions import VisibleDeprecationWarning
 from hyperspy.ui_registry import add_gui_method
+from tqdm.auto import tqdm
 
 _logger = logging.getLogger(__name__)
 
@@ -956,7 +956,7 @@ class BaseModel(list):
     def _assign_twin_value_maps(self):
         'Set the correct values map for the twinned parameters'
         for para in self.twinned_parameters:
-            if self._compute_comp_all_pixels:
+            if self._compute_nav_space_components:
                 para.map['values'] = para.twin_function(
                     para.twin.map['values']) if para.twin_function \
                     else para.twin.map['values']
@@ -982,8 +982,9 @@ class BaseModel(list):
 
     def _append_component(self, component):
         '''The following code works for a component where ax+b/x+c can be
-        multiple pseudo components, not only one'''
-        multi = self._compute_comp_all_pixels
+        multiple pseudo components, not only one
+        '''
+        multi = self._compute_nav_space_components and self._is_multifit
         if component in self.twinned_components:
             # These twinned components have a linear parameter that is twinned
             i = self.twinned_components.index(component)
@@ -1041,6 +1042,7 @@ class BaseModel(list):
             # Entire value of fixed components
             self.fixed_comp_data[:] += component._compute_component(
                 multi=multi)
+
     def _remove_any_zero_components(self):
         '''Remove any zero-components from the comp_data
         
@@ -1048,8 +1050,8 @@ class BaseModel(list):
         it should not be attempted fitted to the region. This method removes it from the array,
         and skips the coefficient multiplication later on for that parameter.
         '''
-        axis = self.axes_manager.navigation_dimension if self._compute_comp_all_pixels else 0
-        if self._compute_comp_all_pixels:
+        axis = self.axes_manager.navigation_dimension if self._compute_nav_space_components else 0
+        if self._compute_nav_space_components:
             self._zero_comp_indices = np.where(np.any(np.invert(self.comp_data.any(axis=axis+1)), axis=self.axes_manager.navigation_indices_in_array))[0]
         else:
             self._zero_comp_indices = np.where(np.invert(self.comp_data.any(axis=1)))[0]
@@ -1058,7 +1060,6 @@ class BaseModel(list):
             self.coefficient_array = np.delete(self.coefficient_array, self._zero_comp_indices, axis=self.axes_manager.navigation_dimension)
         else:
             self.coefficient_array = np.delete(self.coefficient_array, self._zero_comp_indices, axis=0)
-
 
     def calculate_covariance_matrix(self):
         '''Calculate covariance matrix after having performed Linear Regression
@@ -1096,7 +1097,7 @@ class BaseModel(list):
                 np.dot(res_dot[index], inv_fit_dot[index])
         return covariance
 
-    def _linear_fitting(self, multifit=False, bounds=False):
+    def _linear_fitting(self, multifit=False, bounded=False):
         'Parent method for fitting using multivariate linear regression'
         nonlinear = self._get_nonlinear_parameters()
         not_linear_error = "Not all free parameters are linear. " \
@@ -1106,9 +1107,6 @@ class BaseModel(list):
             "parameters are nonlinear:"
         if nonlinear:
             raise AttributeError(not_linear_error + str(nonlinear))
-
-        if bounds:
-            multifit = True
 
         self._is_multifit = multifit
         self._constant_ll = self._check_if_ll_constant()
@@ -1122,9 +1120,17 @@ class BaseModel(list):
             # Then we only need to calculate the component data array once
         else:
             self._uniform_comp_map_vals = False
-        # Set whether components are not equal across the nav space
-        self._compute_comp_all_pixels = self._is_multifit and \
+        # Set whether components are not equal across the nav space, which means
+        # we can fit much faster by giving the same fitting input to all pixels
+        # simultaneously
+        self._compute_nav_space_components = self._is_multifit and \
             not self._uniform_comp_map_vals
+
+        if bounded:
+            # The current bounded fitting algorithm cannot do all nav pixels simultanously
+            self._compute_nav_space_components = self._is_multifit
+            self._uniform_comp_map_vals = False
+
         n_free_para = len(self.free_parameters)
         assert n_free_para > 0, \
             'Model does not contain any free components!'
@@ -1132,7 +1138,6 @@ class BaseModel(list):
         arr_nav_shape = self.axes_manager._navigation_shape_in_array
         nav_shape = arr_nav_shape if self._is_multifit else ()
         comp_nav_shape = () if self._uniform_comp_map_vals else nav_shape
-
         self.comp_data = np.zeros(
             comp_nav_shape + (n_free_para, channels_signal_shape)
         )
@@ -1174,13 +1179,15 @@ class BaseModel(list):
                 self.coefficient_array[:] = linear_regression(
                     y, self.comp_data)
             else:
-                for index in np.ndindex(nav_shape):
+                for index in tqdm(np.ndindex(nav_shape), desc='Performing linear fitting', total=self.axes_manager.navigation_size):
                     # SET BOUNDS HERE ON A PIXEL BY PIXEL BASIS
+                    bounds = get_free_parameter_bounds_scaled(
+                        self) if bounded else False
                     self.coefficient_array[index] = linear_regression(
                         y[index], self.comp_data[index], bounds=bounds)
             covariance = self.calculate_covariance_matrix()
             standard_error = standard_error_from_covariance(covariance)
-            j = 0 # counter to skip any zero-components
+            j = 0  # counter to skip any zero-components
             for i, para in enumerate(self.free_parameters):
                 if i in self._zero_comp_indices:
                     j += 1
@@ -1192,7 +1199,8 @@ class BaseModel(list):
                         para.map['values']*standard_error[..., i-j])
                     para.map['is_set'] = True
         else:
-            self.coefficient_array[:] = linear_regression(y, self.comp_data)
+            bounds = get_free_parameter_bounds_scaled(self) if bounded else False
+            self.coefficient_array[:] = linear_regression(y, self.comp_data, bounds)
             covariance = self.calculate_covariance_matrix()
             standard_error = standard_error_from_covariance(covariance)
             oldp0 = self.p0
@@ -1212,7 +1220,7 @@ class BaseModel(list):
             # reshape back from potentially Signal2D data
             self.comp_data = self.comp_data.reshape(comp_data_shape)
         self.fetch_stored_values()
-        self._compute_comp_all_pixels = False
+        self._compute_nav_space_components = False
 
     def _errfunc2(self, param, y, weights=None):
         if weights is None:
@@ -1637,8 +1645,13 @@ class BaseModel(list):
             fitter = kwargs['fitter']
         else:
             fitter = None
+
+        if "bounded" in kwargs.keys():
+            bounded = kwargs['bounded']
+        else:
+            bounded = False
         if fitter == 'linear':
-            self._linear_fitting(multifit=True)
+            self._linear_fitting(multifit=True, bounded=bounded)
             return
         # except:
         #    pass

@@ -20,8 +20,10 @@ import numpy as np
 import dask.array as da
 import sympy as sp
 
+from scipy.optimize import lsq_linear
 
-def linear_regression(y, comp_data, bounded=False):
+
+def linear_regression(y, comp_data, bounds=False):
     '''
     Performs linear regression on single pixels as well
     as multidimensional arrays
@@ -36,27 +38,32 @@ def linear_regression(y, comp_data, bounded=False):
 
     Returns:
     ----------
-    fit_coefficients : array_like, 
+    fit_coefficients : array_like,
                         shape: (number_of_comp) or (nav_shape, number_of_comp)
 
     '''
-    if isinstance(comp_data, da.Array):
-        lazy = True
-        matmul = da.matmul
-        inv = da.linalg.inv
-        dot = da.dot
-    else:
-        lazy = False
-        matmul = np.matmul
-        inv = np.linalg.inv
-        dot = np.dot
 
-    square = matmul(comp_data, comp_data.T)
-    square_inv = inv(square)
-    comp_data2 = matmul(square_inv, comp_data)
-    fit_coefficients = dot(y, comp_data2.T)
-    if lazy:
-        fit_coefficients = fit_coefficients.compute()
+    if bounds:
+        fit_coefficients = lsq_linear(comp_data.T, y, bounds=bounds).x
+
+    else:
+        if isinstance(comp_data, da.Array):
+            lazy = True
+            matmul = da.matmul
+            inv = da.linalg.inv
+            dot = da.dot
+        else:
+            lazy = False
+            matmul = np.matmul
+            inv = np.linalg.inv
+            dot = np.dot
+
+        square = matmul(comp_data, comp_data.T)
+        square_inv = inv(square)
+        comp_data2 = matmul(square_inv, comp_data)
+        fit_coefficients = dot(y, comp_data2.T)
+        if lazy:
+            fit_coefficients = fit_coefficients.compute()
     return fit_coefficients
 
 
@@ -95,3 +102,14 @@ def get_substituted_twin_function(parameter):
     while parent.twin:
         parent, subs_func = _substitute_twin_function(parameter)
     return subs_func
+
+
+def get_free_parameter_bounds_scaled(model):
+    import numpy as np
+    bounds = []
+    for comp in model:
+        for para in comp.free_parameters:
+            bmin = para.bmin/para.value if para.bmin is not None else -np.inf
+            bmax = para.bmax/para.value if para.bmax is not None else np.inf
+            bounds.append((bmin, bmax))
+    return tuple(np.array(bounds).T)
