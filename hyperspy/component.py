@@ -181,6 +181,7 @@ class Parameter(t.HasTraits):
                            'self': ('id', None),
                            }
         self._slicing_whitelist = {'map': 'inav'}
+        self._is_linear = False
 
     def _load_dictionary(self, dictionary):
         """Load data from dictionary.
@@ -1224,3 +1225,77 @@ class Component(t.HasTraits):
         else:
             display_pretty(current_component_values(
                 self, only_free=only_free))
+
+    @property
+    def is_linear(self):
+        """Loops through the components free parameters,
+        checks that they are linear"""
+        linear = True
+        for para in self.free_parameters:
+            if not para._is_linear:
+                linear = False
+        return linear
+
+    def get_constant_term(self):
+        """Get value of the constant term of the component.
+        Returns 0 for most components."""
+        return 0
+
+    def _compute_component(self):
+        model = self.model
+        if model.convolved and self.convolved:
+            # TODO: Model2D doesn't support a 2D convolution axis (yet)
+            data = self._convolve(
+                self.function(model.convolution_axis), 
+                model=model)
+        else:
+            axes = [ax.axis for ax in model.axes_manager.signal_axes]
+            mesh = np.meshgrid(*axes)
+            not_convolved = self.function(*mesh)
+            data = not_convolved
+        return data.T[np.where(model.channel_switches)[::-1]].T
+
+    def _compute_constant_term(self):
+        model = self.model
+        if model.convolved and self.convolved:
+            convolved = self._convolve(
+                self.get_constant_term(), model=model)
+            data = convolved
+        else:
+            signal_shape = model.axes_manager.signal_shape[::-1]
+            not_convolved = self.get_constant_term() * np.ones(signal_shape)
+            data = not_convolved
+        return data.T[np.where(model.channel_switches)[::-1]].T
+
+    def _convolve(self, to_convolve, model=None):
+        '''Convolve component with model convolution axis
+
+        Multiply by np.ones in order to handle constant case - has no effect on
+        the large'''
+
+        if model is None:
+            model = self.model
+        sig = to_convolve * np.ones(model.convolution_axis.shape)
+
+        if not self.model._compute_comp_all_pixels:
+            # handle fast case when ll is equal in all pixels
+            ll = model.low_loss(model.axes_manager)
+            convolved = np.convolve(sig, ll, mode="valid")
+        elif self.model._compute_comp_all_pixels and self.model._constant_ll:
+            nav_shape = model.axes_manager._navigation_shape_in_array
+            ll = model.low_loss(model.axes_manager)
+            length = max(sig.shape[-1], ll.shape[-1]) - \
+                min(sig.shape[-1], ll.shape[-1]) + 1
+            convolved = np.zeros(nav_shape + (length,)).T # this line is maybe unnecessary, if we remove the [:] in next?
+            convolved[:] = np.convolve(sig, ll, mode="valid")
+            convolved = convolved.T
+        else:
+            nav_shape = model.axes_manager._navigation_shape_in_array
+            ll = model.low_loss.data
+            length = max(sig.shape[-1], ll.shape[-1]) - \
+                min(sig.shape[-1], ll.shape[-1]) + 1
+            convolved = np.zeros(nav_shape + (length,))
+            for index in np.ndindex(nav_shape):
+                convolved[index] = np.convolve(
+                    sig[index], ll[index], mode="valid")
+        return convolved
