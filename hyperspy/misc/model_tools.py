@@ -16,6 +16,8 @@
 # You should have received a copy of the GNU General Public License
 # along with  HyperSpy.  If not, see <http://www.gnu.org/licenses/>.
 
+import numpy as np
+import dask.array as da
 
 def _is_iter(val):
     "Checks if value is a list or tuple"
@@ -183,3 +185,54 @@ class current_model_values():
                         only_active=self.only_active
                         )._repr_html_()
         return html
+
+def linear_regression(y, component_data):
+    '''
+    Performs linear regression on single pixels as well
+    as multidimensional arrays
+
+    Parameters
+    ----------
+    y : array_like, shape: (signal_axis) or (nav_shape, signal_axis)
+        The data to be fit to
+    component_data : array_like, shape: (number_of_comp, signal_axis) or (nav_shape,
+                                    number_of_comp, signal_axis)
+        The components to fit to the data
+
+    Returns:
+    ----------
+    fit_coefficients : array_like, 
+                        shape: (number_of_comp) or (nav_shape, number_of_comp)
+
+    '''
+    # Setting the following will be convenient for future dask/lazy support
+    matmul = np.matmul
+    inv = np.linalg.inv
+    dot = np.dot
+
+    square = matmul(component_data, component_data.T)
+    square_inv = inv(square)
+    component_data2 = matmul(square_inv, component_data)
+    fit_coefficients = dot(y, component_data2.T)
+    return fit_coefficients
+
+
+def standard_error_from_covariance(covariance):
+    'Get standard error coefficients from the diagonal of the covariance'
+    # dask diag only supports 2D arrays, so we cannot use diag (for now)
+    # if isinstance(data, da.Array):
+    #     sqrt = da.sqrt
+    #     diag = da.diag
+    # else:
+    #     sqrt = np.sqrt
+    #     diag = np.diag
+    standard_error = np.sqrt(np.diagonal(covariance, axis1=-2, axis2=-1))
+    return standard_error
+
+
+def get_top_parent_twin(parameter):
+    'Get the top parent twin, if there is one'
+    if parameter.twin:
+        return get_top_parent_twin(parameter.twin)
+    else:
+        return parameter
