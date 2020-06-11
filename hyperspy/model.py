@@ -58,7 +58,6 @@ from hyperspy.docstrings.signal import SHOW_PROGRESSBAR_ARG, PARALLEL_ARG, MAX_W
 
 _logger = logging.getLogger(__name__)
 
-<<<<<<< HEAD
 _COMPONENTS = ALL_EXTENSIONS["components1D"]
 _COMPONENTS.update(ALL_EXTENSIONS["components1D"])
 
@@ -80,19 +79,6 @@ def reconstruct_component(comp_dictionary, **init_args):
             f'{comp_dictionary["package"]} Python package, but ' +
             f'{comp_dictionary["package"]} is not installed.')
     return _class(**init_args)
-=======
-# components is just a container for all (1D and 2D) components, to be able to
-# search in a single object for matching components when recreating a model.
-
-
-class DummyComponentsContainer:
-    pass
-
-
-components = DummyComponentsContainer()
-components.__dict__.update(components1d.__dict__)
-components.__dict__.update(components2d.__dict__)
->>>>>>> Squash: Linear Model and EELS fitting
 
 
 class ModelComponents(object):

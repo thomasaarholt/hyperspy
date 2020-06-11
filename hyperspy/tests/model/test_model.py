@@ -1322,7 +1322,6 @@ class TestAdjustPosition:
         assert len(self.m._position_widgets) == 0
 
 
-<<<<<<< HEAD
 def test_as_signal_parallel():
     import numpy as np
     import hyperspy.api as hs
@@ -1342,7 +1341,7 @@ def test_as_signal_parallel():
                      show_progressbar=False)
 
     np.testing.assert_allclose(s1, s2)
-=======
+
 class TestLinearFitting:
     def setup_method(self, method):
         self.s = hs.datasets.example_signals.EDS_SEM_Spectrum().isig[5.0:15.0]
@@ -1352,9 +1351,4 @@ class TestLinearFitting:
         c = hs.model.components1D.Expression('a*x+b', 'Linear')
         m.append(c)
         m.fit('linear')
-<<<<<<< HEAD
-        np.testing.assert_allclose(m.p0, np.array([941.6686498804164, 47773.64289591281, -5902.642841343069, 57056.112565450574]))
->>>>>>> Linear model fitting functions
-=======
         np.testing.assert_allclose(m.p0, np.array([  933.23430476, 47822.98004313, -5867.61180355, 56805.51887966]))
->>>>>>> Set explicit fit('leastsq') on other tests, fix failing tests

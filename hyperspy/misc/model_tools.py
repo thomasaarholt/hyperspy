@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
-<<<<<<< HEAD
 # Copyright 2007-2020 The HyperSpy developers
-=======
-# Copyright 2007-2016 The HyperSpy developers
->>>>>>> Squash: Linear Model and EELS fitting
 #
 # This file is part of  HyperSpy.
 #
