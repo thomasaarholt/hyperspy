@@ -25,7 +25,7 @@ import warnings
 
 from hyperspy.component import Component
 from hyperspy.docstrings.parameters import FUNCTION_ND_DOCSTRING
-
+from hyperspy.misc.model_tools import get_top_parent_twin
 
 _CLASS_DOC = \
     """%s component (created with Expression).
@@ -71,7 +71,8 @@ class Expression(Component):
 
     def __init__(self, expression, name, position=None, module="numpy",
                  autodoc=True, add_rotation=False, rotation_center=None,
-                 rename_pars={}, compute_gradients=True, **kwargs):
+                 rename_pars={}, compute_gradients=True, linear_override=[], 
+                 **kwargs):
         """Create a component from a string expression.
 
         It automatically generates the partial derivatives and the
@@ -116,6 +117,11 @@ class Expression(Component):
             does not support the calculation of the partial derivatives, for
             example in case of expression containing a "where" condition,
             it can be disabled by using `compute_gradients=False`.
+        linear_override : list
+            A list of the components parameters that are known to be linear
+            parameters, but where the check_parameter_linearity function
+            is unable to determine it as such. Example: PowerLaw, which 
+            includes a "where" function.
         **kwargs
             Keyword arguments can be used to initialise the value of the
             parameters.
@@ -194,8 +200,11 @@ class Expression(Component):
             self.__doc__ = _CLASS_DOC % (
                 name, sympy.latex(_parse_substitutions(expression)))
 
+        for para_name in linear_override:
+            setattr(getattr(self, para_name), '_is_linear_override', True)
+
         for para in self.parameters:
-            para._is_linear = check_parameter_linearity(self._parsed_expr, para.name)
+            para._is_linear = check_parameter_linearity(self._parsed_expr, para.name) if not para._is_linear_override else True
 
     def compile_function(self, module="numpy", position=False):
         """
@@ -321,12 +330,20 @@ class Expression(Component):
     function_nd.__doc__ %= FUNCTION_ND_DOCSTRING
 
     def get_constant_term(self):
-        "Get value of constant term of free component"
+        """
+        Get value of constant term of free component
+        
+        The 'constant' part of a component is any part that cannot change 
+        with the free parameters in the model. The fact that a non-free parameter
+        can change due to being twinned with another (free) parameter complicates 
+        this slightly.
+        """
         # First get currently constant parameters
         linear_parameters = []
-        for para in self.free_parameters:
+        for para in self.parameters:
             if para._is_linear:
-                linear_parameters.append(para.name)
+                if para.free or get_top_parent_twin(para).free:
+                    linear_parameters.append(para.name)
         constant_expr, not_constant_expr = extract_constant_part_of_expression(
             self._str_expression, *linear_parameters)
 

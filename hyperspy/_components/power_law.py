@@ -71,6 +71,7 @@ class PowerLaw(Expression):
             module=module,
             autodoc=False,
             compute_gradients=compute_gradients,
+            linear_override=['A'],
             **kwargs,
         )
 
@@ -85,6 +86,8 @@ class PowerLaw(Expression):
 
         self.isbackground = True
         self.convolved = False
+
+        self.A._is_linear_override = True
 
     def estimate_parameters(self, signal, x1, x2, only_current=False,
                             out=False):

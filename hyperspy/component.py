@@ -182,6 +182,7 @@ class Parameter(t.HasTraits):
                            }
         self._slicing_whitelist = {'map': 'inav'}
         self._is_linear = False
+        self._is_linear_override = False
 
     def _load_dictionary(self, dictionary):
         """Load data from dictionary.
@@ -1237,7 +1238,7 @@ class Component(t.HasTraits):
         return linear
 
     def get_constant_term(self):
-        """Get value of the constant term of the component.
+        """Get value of any (non-free) constant term of the component.
         Returns 0 for most components."""
         return 0
 
@@ -1256,10 +1257,10 @@ class Component(t.HasTraits):
         return data.T[np.where(model.channel_switches)[::-1]].T
 
     def _compute_constant_term(self):
+        'Gets the value of any (non-free) constant term, with convolution'
         model = self.model
         if model.convolved and self.convolved:
-            convolved = self._convolve(
-                self.get_constant_term(), model=model)
+            convolved = self._convolve(self.get_constant_term(), model=model)
             data = convolved
         else:
             signal_shape = model.axes_manager.signal_shape[::-1]
@@ -1270,32 +1271,13 @@ class Component(t.HasTraits):
     def _convolve(self, to_convolve, model=None):
         '''Convolve component with model convolution axis
 
-        Multiply by np.ones in order to handle constant case - has no effect on
-        the large'''
+        Multiply by np.ones in order to handle case where to_convolve is a single constant'''
 
         if model is None:
             model = self.model
         sig = to_convolve * np.ones(model.convolution_axis.shape)
 
-        if not self.model._compute_comp_all_pixels:
-            # handle fast case when ll is equal in all pixels
-            ll = model.low_loss(model.axes_manager)
-            convolved = np.convolve(sig, ll, mode="valid")
-        elif self.model._compute_comp_all_pixels and self.model._constant_ll:
-            nav_shape = model.axes_manager._navigation_shape_in_array
-            ll = model.low_loss(model.axes_manager)
-            length = max(sig.shape[-1], ll.shape[-1]) - \
-                min(sig.shape[-1], ll.shape[-1]) + 1
-            convolved = np.zeros(nav_shape + (length,)).T # this line is maybe unnecessary, if we remove the [:] in next?
-            convolved[:] = np.convolve(sig, ll, mode="valid")
-            convolved = convolved.T
-        else:
-            nav_shape = model.axes_manager._navigation_shape_in_array
-            ll = model.low_loss.data
-            length = max(sig.shape[-1], ll.shape[-1]) - \
-                min(sig.shape[-1], ll.shape[-1]) + 1
-            convolved = np.zeros(nav_shape + (length,))
-            for index in np.ndindex(nav_shape):
-                convolved[index] = np.convolve(
-                    sig[index], ll[index], mode="valid")
+        ll = model.low_loss(model.axes_manager)
+        convolved = np.convolve(sig, ll, mode="valid")
+
         return convolved
