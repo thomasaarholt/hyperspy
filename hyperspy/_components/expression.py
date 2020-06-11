@@ -19,6 +19,8 @@
 from functools import wraps
 import numpy as np
 import sympy
+from sympy.utilities.lambdify import lambdify
+
 import warnings
 
 from hyperspy.component import Component
@@ -152,6 +154,7 @@ class Expression(Component):
         """
         self._add_rotation = add_rotation
         self._str_expression = expression
+        self._module = module
         self._rename_pars = rename_pars
         self._compute_gradients = compute_gradients
         if rotation_center is None:
@@ -191,6 +194,9 @@ class Expression(Component):
             self.__doc__ = _CLASS_DOC % (
                 name, sympy.latex(_parse_substitutions(expression)))
 
+        for para in self.parameters:
+            para._is_linear = check_parameter_linearity(self._parsed_expr, para.name)
+
     def compile_function(self, module="numpy", position=False):
         """
         Compile the function and calculate the gradient automatically when 
@@ -198,7 +204,6 @@ class Expression(Component):
         Useful to recompile the function and gradient with a different module.
         """
         import sympy
-        from sympy.utilities.lambdify import lambdify
         try:  # Expression is just a constant
             float(self._str_expression)
         except ValueError:
@@ -207,6 +212,7 @@ class Expression(Component):
             raise ValueError('Expression must contain a symbol, i.e. x, a, '
                              'etc.')
         expr = _parse_substitutions(self._str_expression)
+        self._parsed_expr = expr
 
         # Extract x
         x = [symbol for symbol in expr.free_symbols if symbol.name == "x"]
@@ -313,3 +319,132 @@ class Expression(Component):
                                *[p.map['values'][..., np.newaxis]
                                  for p in self.parameters])
     function_nd.__doc__ %= FUNCTION_ND_DOCSTRING
+
+    def get_constant_term(self):
+        "Get value of constant term of free component"
+        # First get currently constant parameters
+        linear_parameters = []
+        for para in self.free_parameters:
+            if para._is_linear:
+                linear_parameters.append(para.name)
+        constant_expr, not_constant_expr = extract_constant_part_of_expression(
+            self._str_expression, *linear_parameters)
+
+        # Then replace symbols with value of each parameter
+        free_symbols = [str(free) for free in constant_expr.free_symbols]
+        variables = ["x", "y"] if self._is2D else ["x"]
+        is_variable = []
+        for var in variables:
+            if var in free_symbols:
+                free_symbols.remove(var)
+                is_variable.append(var)
+        signal_dim = len(is_variable)
+        para_values = []
+        for parameter_name in free_symbols:
+            para = getattr(self, parameter_name)
+            para_values.append(para.value)
+        func = lambdify(is_variable + free_symbols, constant_expr,
+                        modules="numpy")
+        axes = []
+        for ax, axis in zip(["x", "y"], self.model.axes_manager.signal_axes):
+            if ax in is_variable:
+                axes.append(axis.axis)
+        mesh = np.meshgrid(*axes)
+        constant = func(*mesh, *para_values)
+        return constant
+
+    def _separate_pseudocomponents(self):
+        '''Separate an expression into a group of lambdified functions
+        that can compute the free parts of the expression, and a single
+        lambdified function that computes the fixed parts of the expression'''
+
+        expr = self._str_expression
+        ex = sympy.sympify(expr)
+        remaining_elements = ex.copy()
+        free_pseudo_components = {}
+        variables = ("x", "y") if self._is2D else ("x", )
+        for para in self.free_parameters:
+            element = ex.as_independent(para.name)[-1]
+            remaining_elements -= element
+            element_names = set([str(p)
+                                 for p in element.free_symbols]) - set(variables)
+
+            free_pseudo_components[para.name] = {
+                'function': lambdify(variables + tuple(element_names), element, modules=self._module),
+                'parameters': [getattr(self, e) for e in element_names]
+            }
+
+        element_names = set(
+            [str(p) for p in remaining_elements.free_symbols]) - set(variables)
+        fixed_pseudo_components = {
+            'function': lambdify(variables + tuple(element_names), remaining_elements, modules=self._module),
+            'parameters': [getattr(self, e) for e in element_names]
+        }
+
+        return free_pseudo_components, fixed_pseudo_components,
+
+    def _compute_expression_part(self, part):
+        'Compute the expression for a given value or map["values"]'
+        model = self.model
+        function = part['function']
+        parameters = part['parameters']
+        arr_nav_shape = model.axes_manager._navigation_shape_in_array
+        parameters = [para.value for para in parameters]
+        nav_shape = ()
+        signal_shape = model.axes_manager._signal_shape_in_array
+        if model.convolved and self.convolved:
+            shape = model.convolution_axis
+            convolution_axis = model.convolution_axis.reshape(
+                shape + len(nav_shape)*(1,))
+            data = self._convolve(
+                function(convolution_axis, *parameters), model=model)
+        else:
+            axes = [ax.axis for ax in model.axes_manager.signal_axes]
+            mesh = np.meshgrid(*axes)
+            shape = mesh[0].shape
+            mesh = [m.reshape(shape + len(nav_shape)*(1,)) for m in mesh]
+            data = function(*mesh, *parameters)
+            if np.shape(data) == ():
+                data = data * \
+                    np.ones(signal_shape)[np.where(model.channel_switches)]
+            elif np.shape(data) == arr_nav_shape:
+                data = data[..., None] * \
+                    np.ones(signal_shape)[np.where(model.channel_switches)]
+            else:
+                data = data[np.where(model.channel_switches)]
+                data = np.moveaxis(data, 0, -1)
+        return data
+
+
+def check_parameter_linearity(expr, name):
+    "Check whether expression is linear for a given parameter"
+    try:
+        if not sympy.Eq(sympy.diff(expr, name, 2), 0):
+            return False
+    except TypeError:
+        return False
+    return True
+
+
+def check_if_parameter_is_offset(expr, name):
+    '''Separate offset from an expression, for instance
+    b from ax+b in an expression
+    expr : str - component expression
+    name : str - attribute in expression to determine
+    '''
+    first_derivative_for_x = sympy.Eq(sympy.diff(expr, name, 1), 0)
+    return first_derivative_for_x == False
+
+
+def extract_constant_part_of_expression(expr, *args):
+    """
+    Check linearity by multiplying a parameter by a factor and testing if the
+    new expression is equal to multiplying the whole expression by the same factor.
+    Testing parameter `a` in example expression `f(x) = a*x + b` by multiplying
+    by factor `factor`:
+
+    `a` is linear if ``(a*LIN)*x + b == LIN*f(x)``
+    """
+    expr = sympy.sympify(expr)
+    constant, not_constant = expr.as_independent(*args, as_Add=True)
+    return constant, not_constant
