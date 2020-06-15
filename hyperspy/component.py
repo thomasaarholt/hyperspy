@@ -1237,7 +1237,16 @@ class Component(t.HasTraits):
                 linear = False
         return linear
 
-    def get_constant_term(self):
+    @property
+    def linear_parameters(self):
+        return [para for para in self.free_parameters if para._is_linear]
+
+    @property
+    def nonlinear_parameters(self):
+        return [para for para in self.free_parameters if not para._is_linear]
+
+    @property
+    def _constant_term(self):
         """Get value of any (non-free) constant term of the component.
         Returns 0 for most components."""
         return 0
@@ -1260,11 +1269,11 @@ class Component(t.HasTraits):
         'Gets the value of any (non-free) constant term, with convolution'
         model = self.model
         if model.convolved and self.convolved:
-            convolved = self._convolve(self.get_constant_term(), model=model)
+            convolved = self._convolve(self._constant_term, model=model)
             data = convolved
         else:
             signal_shape = model.axes_manager.signal_shape[::-1]
-            not_convolved = self.get_constant_term() * np.ones(signal_shape)
+            not_convolved = self._constant_term * np.ones(signal_shape)
             data = not_convolved
         return data.T[np.where(model.channel_switches)[::-1]].T
 
