@@ -34,7 +34,7 @@ class TestLinearFitting:
             b = 4.0)
         self.m.append(g)
         g.b.free = False
-        assert g.get_constant_term() == 4.0
+        assert g._constant_term == 4.0
 
     def test_constant_from_expression2(self):
         expression = "A * exp(-(x-centre)**2/(2*sigma**2))"
@@ -45,7 +45,7 @@ class TestLinearFitting:
             centre = 4.0,
             sigma = 1.0)
         self.m.append(h)
-        assert h.get_constant_term() == 0
+        assert h._constant_term == 0
         h.centre.free = False
         h.sigma.free = False
-        assert h.get_constant_term() == 0
+        assert h._constant_term == 0
