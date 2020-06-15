@@ -18,7 +18,7 @@
 
 import numpy as np
 
-from hyperspy.component import Component
+from hyperspy.component import Component, Parameter
 from hyperspy.axes import AxesManager
 from unittest import mock
 
@@ -262,3 +262,13 @@ class TestCallMethods:
         c.model.__call__.return_value = np.array([1.1, 1.3])
         res = c._component2plot(c.model.axes_manager, out_of_range2nans=True)
         np.testing.assert_array_equal(res, np.array([1.1, np.nan, 1.3]))
+
+class TestLinearProperties:
+    def setup_method(self, method):
+        self.C = Component(['one', 'two'])
+        self.P = Parameter()
+
+    def test_properties(self):
+        assert not self.C.linear_parameters
+        assert len(self.C.nonlinear_parameters) == 2
+        assert not P._is_linear()
