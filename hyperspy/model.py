@@ -62,6 +62,8 @@ from hyperspy.misc.utils import (dummy_context_manager, shorten_name, slugify,
                                  stash_active_state)
 from hyperspy.signal import BaseSignal
 from hyperspy.ui_registry import add_gui_method
+from hyperspy.misc.machine_learning import import_sklearn
+
 
 _logger = logging.getLogger(__name__)
 
@@ -1117,8 +1119,15 @@ class BaseModel(list):
                 np.dot(res_dot[index], inv_fit_dot[index])
         return covariance
 
-    def _linear_fitting(self):
-        'Parent method for fitting using multivariate linear regression'
+    def _linear_fitting(self, algorithm='ridge_regression'):
+        """
+        Multivariate linear fitting
+
+        Parameters:
+        algorithm: 
+            'ridge_regression' - Default using sklearn
+            'matrix_inversion' - Fallback, fragile
+        """
         not_linear_error = "Not all free parameters are linear. " \
             "Fit with a " \
             "different fitter or set non-linear " \
@@ -1173,7 +1182,20 @@ class BaseModel(list):
         # Reshape what may potentially be Signal2D data into a long Signal1D shape
         target_signal = target_signal.reshape(nav_shape + (sig1Dshape,))
     
-        self.coefficient_array[:] = linear_regression(target_signal, self._component_data)
+        #self.coefficient_array[:] = linear_regression(target_signal, self._component_data)
+        if not import_sklearn.sklearn_installed or algorithm=='matrix_inversion':
+            if algorithm == 'ridge_regression':
+                warnings.warn(
+                "Linear fitting is preferably done using the scikit-learn ridge regression code. "
+                "Install scikit-learn (sklearn) to use it. Proceding using a more fragile "
+                "matrix inversion approach."
+                )
+            self.coefficient_array[:] = linear_regression(target_signal, self._component_data)
+        elif algorithm == 'ridge_regression':
+            ridge_regression = import_sklearn.sklearn.linear_model._ridge.ridge_regression
+            self.coefficient_array[:] = ridge_regression(self._component_data.T, target_signal, alpha=0.0, solver="cholesky")
+        else:
+            raise ValueError("linear_algorithm {} not supported. Use 'ridge_regression' or 'matrix_inversion'.".format(algorithm))
         covariance = self.calculate_covariance_matrix(target_signal)
         standard_error = standard_error_from_covariance(covariance)
         oldp0 = self.p0
@@ -1702,8 +1724,7 @@ class BaseModel(list):
                 self.p_std = self.fit_output.perror
 
             elif fitter == "linear":
-                self._linear_fitting()
-
+                self._linear_fitting(algorithm=linear_algorithm)
             else:
                 # scipy.optimize.* functions
                 if loss_function == "ls":
