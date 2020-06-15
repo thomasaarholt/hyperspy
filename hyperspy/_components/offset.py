@@ -137,7 +137,8 @@ class Offset(Component):
 
     function_nd.__doc__ %= FUNCTION_ND_DOCSTRING
 
-    def get_constant_term(self):
+    @property
+    def _constant_term(self):
         "Get value of constant term of component"
         # First get currently constant parameters
         if self.offset.free:
