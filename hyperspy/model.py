@@ -1032,7 +1032,7 @@ class BaseModel(list):
                 np.dot(res_dot[index], inv_fit_dot[index])
         return covariance
 
-    def _linear_fitting(self, algorithm='ridge_regression'):
+    def _linear_fitting(self, algorithm='ridge_regression', **kwargs):
         """
         Multivariate linear fitting
 
@@ -1094,10 +1094,8 @@ class BaseModel(list):
 
         # Reshape what may potentially be Signal2D data into a long Signal1D shape
         target_signal = target_signal.reshape(nav_shape + (sig1Dshape,))
-    
-        #self.coefficient_array[:] = linear_regression(target_signal, self._component_data)
         if not import_sklearn.sklearn_installed or algorithm=='matrix_inversion':
-            if algorithm == 'ridge_regression':
+            if algorithm != 'matrix_inversion':
                 warnings.warn(
                 "Linear fitting is preferably done using the scikit-learn ridge regression code. "
                 "Install scikit-learn (sklearn) to use it. Proceding using a more fragile "
@@ -1105,8 +1103,11 @@ class BaseModel(list):
                 )
             self.coefficient_array[:] = linear_regression(target_signal, self._component_data)
         elif algorithm == 'ridge_regression':
+            ridge_regression_solver = kwargs.pop('solver', 'auto')
+            ridge_regression_alpha = kwargs.pop('alpha', '0.0')
+
             ridge_regression = import_sklearn.sklearn.linear_model._ridge.ridge_regression
-            self.coefficient_array[:] = ridge_regression(self._component_data.T, target_signal, alpha=0.0, solver="cholesky")
+            self.coefficient_array[:] = ridge_regression(self._component_data.T, target_signal, alpha = ridge_regression_alpha, solver = ridge_regression_solver)
         else:
             raise ValueError("linear_algorithm {} not supported. Use 'ridge_regression' or 'matrix_inversion'.".format(algorithm))
         covariance = self.calculate_covariance_matrix(target_signal)
@@ -1281,7 +1282,10 @@ class BaseModel(list):
                 self.ensure_parameters_in_bounds()
         min_function = kwargs.pop('min_function', None)
         min_function_grad = kwargs.pop('min_function_grad', None)
+        
         linear_algorithm = kwargs.pop('linear_algorithm', 'ridge_regression')
+        self._linear_algorithm = linear_algorithm # used for tests
+
         if method == 'custom':
             if not callable(min_function):
                 raise ValueError('Custom minimization requires "min_function" '
@@ -1457,7 +1461,7 @@ class BaseModel(list):
                         (len(args[0]) - len(self.p0)))
                 self.fit_output = m
             elif fitter == "linear":
-                self._linear_fitting(algorithm=linear_algorithm)
+                self._linear_fitting(algorithm=linear_algorithm, kwargs=kwargs)
             else:
                 # General optimizers
                 # Least squares or maximum likelihood

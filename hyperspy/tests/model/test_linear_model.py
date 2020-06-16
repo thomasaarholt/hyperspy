@@ -73,7 +73,7 @@ class TestMultiFitLinear:
         m.fit(fitter='linear')
         single = m.as_signal()
         m.assign_current_values_to_all()
-        m.multifit(fitter='linear')
+        m.multifit(fitter='linear', iterpath='flyback')
         multi = m.as_signal()
 
         np.testing.assert_almost_equal(
@@ -87,7 +87,7 @@ class TestMultiFitLinear:
         m.fit(fitter='linear')
         single = m.as_signal()
         m.assign_current_values_to_all()
-        m.multifit(fitter='linear')
+        m.multifit(fitter='linear', iterpath='flyback')
         multi = m.as_signal()
         # compare fits from first pixel
         np.testing.assert_almost_equal(
@@ -118,6 +118,25 @@ class TestLinearFitting:
         c.b.free = False
         constant = c._compute_constant_term()
         np.testing.assert_array_almost_equal(constant, c.b.value)
+
+class TestFitAlgorithms:
+    def setup_method(self, method):
+        self.s = EDS_SEM_Spectrum().isig[5.0:15.0]
+        self.m = self.s.create_model(auto_background=False)
+        self.c = Expression('a*x+b', 'line with offset')
+        self.m.append(self.c)
+
+    def test_compare_algorithms(self):
+        m = self.m
+        m.fit(linear_algorithm='ridge_regression')
+        assert m._linear_algorithm == 'ridge_regression'
+        assert m._ridge_regression_alpha == 'auto'
+        ridge_fit = m.as_signal()
+
+        m.fit(linear_algorithm='matrix_inversion')
+        assert m._linear_algorithm == 'matrix_inversion'
+        matrix_fit = m.as_signal()
+        np.testing.assert_array_almost_equal(ridge_fit.data, matrix_fit.data)
 
 class TestLinearEELSFitting:
     def setup_method(self, method):
