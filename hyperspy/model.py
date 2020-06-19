@@ -911,9 +911,14 @@ class BaseModel(list):
                             linear.append(parameter)
         return linear
 
-    def _set_linear_parameters_to_one(self):
-        for parameter in self.linear_parameters:
-            parameter.value = 1
+    def _set_linear_parameters_to_one(self, concurrent_fit=False):
+        if concurrent_fit:
+            for parameter in self.linear_parameters:
+                parameter.value = 1
+                parameter.map['values'] = 1
+        else:
+            for parameter in self.linear_parameters:
+                parameter.value = 1
 
     def p0_index_from_component(self, component):
         'Get p0 index for components that have only one free parameter'
@@ -1032,7 +1037,7 @@ class BaseModel(list):
                 np.dot(res_dot[index], inv_fit_dot[index])
         return covariance
 
-    def _linear_fitting(self, algorithm='ridge_regression', **kwargs):
+    def _linear_fitting(self, algorithm='ridge_regression', concurrent_fit=False, **kwargs):
         """
         Multivariate linear fitting
 
@@ -1055,24 +1060,20 @@ class BaseModel(list):
             raise AttributeError("There are no linear components in this model")
 
 
-        self._set_linear_parameters_to_one()
+        self._set_linear_parameters_to_one(concurrent_fit=concurrent_fit)
         self._set_p0()
         n_free_para = len(self.free_parameters)
         assert n_free_para > 0, 'Model does not contain any free components!'
         channels_signal_shape = np.count_nonzero(self.channel_switches)
-        arr_nav_shape = self.axes_manager._navigation_shape_in_array
         
         # nav_shape and comp_nav_shape may change with future linear fitting speedups
-        nav_shape = ()
-        comp_nav_shape = ()
+        nav_shape = self.axes_manager._navigation_shape_in_array if concurrent_fit else ()
+        flat_nav_shape = (np.prod(self.axes_manager._navigation_shape_in_array), ) if concurrent_fit else ()
 
-        self._component_data = np.zeros(
-            comp_nav_shape + (n_free_para, channels_signal_shape)
-        )
-        self._component_data_fixed = np.zeros(
-            comp_nav_shape + (channels_signal_shape, ))
+        self._component_data = np.zeros((n_free_para, channels_signal_shape))
+        self._component_data_fixed = np.zeros((channels_signal_shape, ))
+        self.coefficient_array = np.zeros(flat_nav_shape +  (n_free_para, ))
 
-        self.coefficient_array = np.zeros(nav_shape + (n_free_para,))
         self._set_twinned_lists()
         self._assign_twin_value_maps()
         for component in self:
@@ -1082,7 +1083,10 @@ class BaseModel(list):
         # The linear components
         self._remove_any_zero_components()
 
-        target_signal = self.signal()[np.where(self.channel_switches)]
+        if concurrent_fit:
+            target_signal = self.signal.data.T[np.where(self.channel_switches.T)].T
+        else:
+            target_signal = self.signal()[np.where(self.channel_switches)]
 
         if self.signal.metadata.Signal.binned is True:
             target_signal = target_signal / np.prod(tuple((ax.scale for ax in self.signal.axes_manager.signal_axes)))
@@ -1093,7 +1097,11 @@ class BaseModel(list):
         sig1Dshape = np.count_nonzero(self.channel_switches)
 
         # Reshape what may potentially be Signal2D data into a long Signal1D shape
-        target_signal = target_signal.reshape(nav_shape + (sig1Dshape,))
+        target_signal = target_signal.reshape(flat_nav_shape + (sig1Dshape,))
+        target_signal = target_signal.T
+        self._component_data = self._component_data
+        print(target_signal.shape, self._component_data.shape)
+        print('sec', self.coefficient_array.shape)
         if not import_sklearn.sklearn_installed or algorithm=='matrix_inversion':
             if algorithm != 'matrix_inversion':
                 warnings.warn(
@@ -1108,27 +1116,42 @@ class BaseModel(list):
 
             ridge_regression = import_sklearn.sklearn.linear_model._ridge.ridge_regression
             self.coefficient_array[:] = ridge_regression(self._component_data.T, target_signal, alpha = ridge_regression_alpha, solver = ridge_regression_solver)
+            self.coefficient_array = self.coefficient_array.reshape(nav_shape + (component_data_shape[0], ))
         else:
             raise ValueError("linear_algorithm {} not supported. Use 'ridge_regression' or 'matrix_inversion'.".format(algorithm))
-        covariance = self.calculate_covariance_matrix(target_signal)
-        standard_error = standard_error_from_covariance(covariance)
-        oldp0 = self.p0
-        self.p0 = ()
-        self.p_std = ()
-        j = 0
-        for i, p in enumerate(oldp0):
-            if i in self._zero_comp_indices:
-                # components that were removed from linear fitting bc they were zero
-                self.p0 += (0,)
-                self.p_std += (np.nan,)
-                j += 1
-            else:
-                p0 = p * self.coefficient_array[i-j]
-                self.p0 += (p0,)
-                self.p_std += (abs(p0*standard_error[i-j]),) 
-        self.store_current_values()
-        # reshape back from potentially Signal2D data
-        self._component_data = self._component_data.reshape(component_data_shape)
+        
+        del self._component_data
+        
+        #covariance = self.calculate_covariance_matrix(target_signal)
+        #standard_error = standard_error_from_covariance(covariance)
+        if concurrent_fit:
+            j = 0 # counter to skip any zero-components
+            for i, para in enumerate(self.free_parameters):
+                if i in self._zero_comp_indices:
+                    j += 1
+                    pass
+                else:
+                    para.map['values'] = para.map['values'] * \
+                        self.coefficient_array[..., i-j]
+                    #para.map['std'] = np.abs(
+                    #    para.map['values']*standard_error[..., i-j])
+                    para.map['is_set'] = True
+        else:
+            oldp0 = self.p0
+            self.p0 = ()
+            self.p_std = ()
+            j = 0
+            for i, p in enumerate(oldp0):
+                if i in self._zero_comp_indices:
+                    # components that were removed from linear fitting bc they were zero
+                    self.p0 += (0,)
+                    self.p_std += (np.nan,)
+                    j += 1
+                else:
+                    p0 = p * self.coefficient_array[i-j]
+                    self.p0 += (p0,)
+            #         self.p_std += (abs(p0*standard_error[i-j]),) 
+            self.store_current_values()
         self.fetch_stored_values()
 
     def _errfunc2(self, param, y, weights=None):
@@ -1542,7 +1565,7 @@ class BaseModel(list):
 
     def multifit(self, mask=None, fetch_only_fixed=False,
                  autosave=False, autosave_every=10, show_progressbar=None,
-                 interactive_plot=False, iterpath=None, **kwargs):
+                 interactive_plot=False, iterpath=None, concurrent_fit=False, **kwargs):
         """Fit the data to the model at all the positions of the
         navigation dimensions.
 
@@ -1610,39 +1633,48 @@ class BaseModel(list):
                 "The mask must be a numpy array of boolean type with "
                 " shape: %s" +
                 str(self.axes_manager._navigation_shape_in_array))
-        masked_elements = 0 if mask is None else mask.sum()
-        maxval = self.axes_manager.navigation_size - masked_elements
-        show_progressbar = show_progressbar and (maxval > 0)
-        if iterpath == None:
-            self.axes_manager._iterpath = 'flyback'
-            msg = ("The `iterpath` default will change from `'flyback'` to `'serpentine'`"
-            "in HyperSpy version 2.0. Change `iterpath` to other than None to suppress this"
-            "warning.")
-            warnings.warn(msg, VisibleDeprecationWarning)
+        
+        if concurrent_fit:
+            try:
+                kwargs['fitter'] == 'linear'
+            except:
+                raise ValueError('argument "fitter" is either not set, or not set to "linear".')
+            linear_algorithm = kwargs.pop('linear_algorithm', 'ridge_regression')
+            self._linear_fitting(algorithm=linear_algorithm, concurrent_fit=concurrent_fit, kwargs=kwargs)
         else:
-            self.axes_manager._iterpath = iterpath
-        i = 0
-        with self.axes_manager.events.indices_changed.suppress_callback(
-                self.fetch_stored_values):
-            if interactive_plot:
-                outer = dummy_context_manager
-                inner = self.suspend_update
+            masked_elements = 0 if mask is None else mask.sum()
+            maxval = self.axes_manager.navigation_size - masked_elements
+            show_progressbar = show_progressbar and (maxval > 0)
+            if iterpath == None:
+                self.axes_manager._iterpath = 'flyback'
+                msg = ("The `iterpath` default will change from `'flyback'` to `'serpentine'`"
+                "in HyperSpy version 2.0. Change `iterpath` to other than None to suppress this"
+                "warning.")
+                warnings.warn(msg, VisibleDeprecationWarning)
             else:
-                outer = self.suspend_update
-                inner = dummy_context_manager
-            with outer(update_on_resume=True):
-                with progressbar(total=maxval, disable=not show_progressbar,
-                                 leave=True) as pbar:
-                    for index in self.axes_manager:
-                        with inner(update_on_resume=True):
-                            if mask is None or not mask[index[::-1]]:
-                                self.fetch_stored_values(
-                                    only_fixed=fetch_only_fixed)
-                                self.fit(**kwargs)
-                                i += 1
-                                pbar.update(1)
-                            if autosave is True and i % autosave_every == 0:
-                                self.save_parameters2file(autosave_fn)
+                self.axes_manager._iterpath = iterpath
+            i = 0
+            with self.axes_manager.events.indices_changed.suppress_callback(
+                    self.fetch_stored_values):
+                if interactive_plot:
+                    outer = dummy_context_manager
+                    inner = self.suspend_update
+                else:
+                    outer = self.suspend_update
+                    inner = dummy_context_manager
+                with outer(update_on_resume=True):
+                    with progressbar(total=maxval, disable=not show_progressbar,
+                                    leave=True) as pbar:
+                        for index in self.axes_manager:
+                            with inner(update_on_resume=True):
+                                if mask is None or not mask[index[::-1]]:
+                                    self.fetch_stored_values(
+                                        only_fixed=fetch_only_fixed)
+                                    self.fit(**kwargs)
+                                    i += 1
+                                    pbar.update(1)
+                                if autosave is True and i % autosave_every == 0:
+                                    self.save_parameters2file(autosave_fn)
         if autosave is True:
             _logger.info(
                 'Deleting the temporary file %s pixels' % (
