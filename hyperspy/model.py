@@ -1172,7 +1172,7 @@ class BaseModel(list):
         target_signal = self.signal()[np.where(self.channel_switches)]
 
         if self.signal.metadata.Signal.binned is True:
-            target_signal = target_signal / self.signal.axes_manager[-1].scale
+            target_signal = target_signal / np.prod(tuple((ax.scale for ax in self.signal.axes_manager.signal_axes)))
 
         target_signal = target_signal - self._component_data_fixed  # - model_constant_term
 
