@@ -1100,8 +1100,6 @@ class BaseModel(list):
         target_signal = target_signal.reshape(flat_nav_shape + (sig1Dshape,))
         target_signal = target_signal.T
         self._component_data = self._component_data
-        print(target_signal.shape, self._component_data.shape)
-        print('sec', self.coefficient_array.shape)
         if not import_sklearn.sklearn_installed or algorithm=='matrix_inversion':
             if algorithm != 'matrix_inversion':
                 warnings.warn(
@@ -1120,10 +1118,8 @@ class BaseModel(list):
         else:
             raise ValueError("linear_algorithm {} not supported. Use 'ridge_regression' or 'matrix_inversion'.".format(algorithm))
         
-        del self._component_data
-        
-        #covariance = self.calculate_covariance_matrix(target_signal)
-        #standard_error = standard_error_from_covariance(covariance)
+        covariance = self.calculate_covariance_matrix(target_signal)
+        standard_error = standard_error_from_covariance(covariance)
         if concurrent_fit:
             j = 0 # counter to skip any zero-components
             for i, para in enumerate(self.free_parameters):
@@ -1150,7 +1146,7 @@ class BaseModel(list):
                 else:
                     p0 = p * self.coefficient_array[i-j]
                     self.p0 += (p0,)
-            #         self.p_std += (abs(p0*standard_error[i-j]),) 
+                    self.p_std += (abs(p0*standard_error[i-j]),) 
             self.store_current_values()
         self.fetch_stored_values()
 
