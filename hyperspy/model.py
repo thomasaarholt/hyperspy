@@ -1010,20 +1010,22 @@ class BaseModel(list):
         self.coefficient_array = np.delete(self.coefficient_array, self._zero_comp_indices, axis=0)
 
 
-    def calculate_covariance_matrix(self, target_signal):
+    def calculate_covariance_matrix(self, target_signal, concurrent_fit=False):
         '''Calculate covariance matrix after having performed Linear Regression
         '''
         n = np.count_nonzero(self.channel_switches)  # the signal axis length
         k = self._component_data.shape[-2]  # the number of components
-        nav_shape = () # Keep nav_shape as it will be useful to modify for later updates to linear fititng
-
+        
+        if concurrent_fit:
+            nav_shape = self.axes_manager._navigation_shape_in_array
+        else:
+            nav_shape = ()
         fit = np.zeros(nav_shape + (n, k))
         # Either component_data is the same across all nav, or not.
         # Keep nav_shape for later updates to linear fitting
         # For single pixels
         for index in np.ndindex(nav_shape):
-            fit[index] = (self._component_data[index].T *
-                            self.coefficient_array[index])
+            fit[index] = self._component_data.T * self.coefficient_array[index]
         res = target_signal - fit.sum(-1)  # The residual
         res_dot = np.zeros(nav_shape)
         for index in np.ndindex(nav_shape):
@@ -1098,7 +1100,7 @@ class BaseModel(list):
 
         # Reshape what may potentially be Signal2D data into a long Signal1D shape
         target_signal = target_signal.reshape(flat_nav_shape + (sig1Dshape,))
-        target_signal = target_signal.T
+        target_signal = target_signal
         self._component_data = self._component_data
         if not import_sklearn.sklearn_installed or algorithm=='matrix_inversion':
             if algorithm != 'matrix_inversion':
@@ -1113,12 +1115,12 @@ class BaseModel(list):
             ridge_regression_alpha = kwargs.pop('alpha', '0.0')
 
             ridge_regression = import_sklearn.sklearn.linear_model._ridge.ridge_regression
-            self.coefficient_array[:] = ridge_regression(self._component_data.T, target_signal, alpha = ridge_regression_alpha, solver = ridge_regression_solver)
-            self.coefficient_array = self.coefficient_array.reshape(nav_shape + (component_data_shape[0], ))
+            self.coefficient_array[:] = ridge_regression(self._component_data.T, target_signal.T, alpha = ridge_regression_alpha, solver = ridge_regression_solver)
         else:
             raise ValueError("linear_algorithm {} not supported. Use 'ridge_regression' or 'matrix_inversion'.".format(algorithm))
         
-        covariance = self.calculate_covariance_matrix(target_signal)
+        self.coefficient_array = self.coefficient_array.reshape(nav_shape + (component_data_shape[0], ))
+        covariance = self.calculate_covariance_matrix(target_signal.reshape(nav_shape + (sig1Dshape,)), concurrent_fit=concurrent_fit)
         standard_error = standard_error_from_covariance(covariance)
         if concurrent_fit:
             j = 0 # counter to skip any zero-components
@@ -1129,8 +1131,8 @@ class BaseModel(list):
                 else:
                     para.map['values'] = para.map['values'] * \
                         self.coefficient_array[..., i-j]
-                    #para.map['std'] = np.abs(
-                    #    para.map['values']*standard_error[..., i-j])
+                    para.map['std'] = np.abs(
+                        para.map['values']*standard_error[..., i-j])
                     para.map['is_set'] = True
         else:
             oldp0 = self.p0
