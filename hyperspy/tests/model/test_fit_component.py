@@ -214,5 +214,5 @@ class TestStdWithMultipleFitters:
     @pytest.mark.parametrize("fitter", ['leastsq', 'linear', 'mpfit', 'odr'])
     def test_fitters(self, fitter):
         self.m.fit(fitter=fitter)
-        np.testing.assert_almost_equal(self.g1.A.std, 0.29659216999703825, decimal=6)
-        np.testing.assert_almost_equal(self.g1.A.std, self.g2.A.std)
+        np.testing.assert_almost_equal(self.g1.A.std, 0.29659, decimal=5)
+        np.testing.assert_almost_equal(self.g1.A.std, self.g2.A.std, decimal=5)
