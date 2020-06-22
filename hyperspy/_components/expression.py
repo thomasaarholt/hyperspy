@@ -382,7 +382,8 @@ class Expression(Component):
         free_pseudo_components = {}
         variables = ("x", "y") if self._is2D else ("x", )
         for para in self.free_parameters:
-            element = ex.as_independent(para.name)[-1]
+            symbol = sympy.sympify(para.name, strict=False)
+            element = ex.as_independent(symbol)[-1]
             remaining_elements -= element
             element_names = set([str(p)
                                  for p in element.free_symbols]) - set(variables)
@@ -433,26 +434,21 @@ class Expression(Component):
                 data = np.moveaxis(data, 0, -1)
         return data
 
-
 def check_parameter_linearity(expr, name):
     "Check whether expression is linear for a given parameter"
+    symbol = sympy.Symbol(name)
     try:
-        if not sympy.Eq(sympy.diff(expr, name, 2), 0):
+        if not sympy.Eq(sympy.diff(expr, symbol, 2), 0):
             return False
     except TypeError:
+        # typeerror occurs if the parameter is nonlinear
+        return False
+    except AttributeError:
+        # attreibuteerror occurs if the expression cannot be parsed
+        # for instance some expressions with where.
+        # here, para._is_linear_override should be set
         return False
     return True
-
-
-def check_if_parameter_is_offset(expr, name):
-    '''Separate offset from an expression, for instance
-    b from ax+b in an expression
-    expr : str - component expression
-    name : str - attribute in expression to determine
-    '''
-    first_derivative_for_x = sympy.Eq(sympy.diff(expr, name, 1), 0)
-    return first_derivative_for_x == False
-
 
 def extract_constant_part_of_expression(expr, *args):
     """
@@ -464,5 +460,6 @@ def extract_constant_part_of_expression(expr, *args):
     `a` is linear if ``(a*LIN)*x + b == LIN*f(x)``
     """
     expr = sympy.sympify(expr)
+    args = [sympy.sympify(arg, strict=False) for arg in args]
     constant, not_constant = expr.as_independent(*args, as_Add=True)
     return constant, not_constant

@@ -272,4 +272,4 @@ class TestLinearProperties:
     def test_properties(self):
         assert not self.C.linear_parameters
         assert len(self.C.nonlinear_parameters) == 2
-        assert not P._is_linear()
+        assert not self.P._is_linear
