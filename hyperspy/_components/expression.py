@@ -382,7 +382,8 @@ class Expression(Component):
         free_pseudo_components = {}
         variables = ("x", "y") if self._is2D else ("x", )
         for para in self.free_parameters:
-            element = ex.as_independent(para.name)[-1]
+            symbol = sympy.sympify(para.name, strict=False)
+            element = ex.as_independent(symbol)[-1]
             remaining_elements -= element
             element_names = set([str(p)
                                  for p in element.free_symbols]) - set(variables)
@@ -464,5 +465,6 @@ def extract_constant_part_of_expression(expr, *args):
     `a` is linear if ``(a*LIN)*x + b == LIN*f(x)``
     """
     expr = sympy.sympify(expr)
+    args = [sympy.sympify(arg, strict=False) for arg in args]
     constant, not_constant = expr.as_independent(*args, as_Add=True)
     return constant, not_constant
