@@ -161,7 +161,7 @@ class current_model_values():
                         component=comp, only_free=self.only_free, only_active=self.only_active)._repr_html_()
         return html
 
-def linear_regression(y, component_data):
+def linear_regression(y, component_data, use_cupy=False):
     '''
     Performs linear regression on single pixels as well
     as multidimensional arrays
@@ -181,15 +181,47 @@ def linear_regression(y, component_data):
 
     '''
     # Setting the following will be convenient for future dask/lazy support
-    matmul = np.matmul
-    inv = np.linalg.inv
-    dot = np.dot
+    import numpy as np
+    use_dask = False
+
+    if use_cupy:
+        import cupy as cp
+        asarray = cp.asarray
+        asnumpy = cp.asnumpy
+        matmul = cp.matmul
+        inv = cp.linalg.inv
+        dot = cp.dot
+
+    elif "dask" in str(type(y)):
+        use_dask = True
+        print('dask?')
+        import dask as da
+        asnumpy = np.asarray
+        asarray = da.array.asarray
+        matmul = da.array.matmul
+        inv = da.array.linalg.inv
+        dot = da.array.dot
+
+    else:
+        print('numpy?')
+        asarray = np.asarray
+        asnumpy = np.asarray
+        matmul = np.matmul
+        inv = np.linalg.inv
+        dot = np.dot
+
+    component_data = asarray(component_data)
+    y = asarray(y)
 
     square = matmul(component_data, component_data.T)
     square_inv = inv(square)
     component_data2 = matmul(square_inv, component_data)
     fit_coefficients = dot(y, component_data2.T)
-    return fit_coefficients
+    if use_dask:
+        from dask.diagnostics import ProgressBar
+        with ProgressBar():
+            fit_coefficients = fit_coefficients.compute()
+    return asnumpy(fit_coefficients)
 
 
 def standard_error_from_covariance(covariance):

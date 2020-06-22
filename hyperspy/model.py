@@ -1010,9 +1010,26 @@ class BaseModel(list):
         self.coefficient_array = np.delete(self.coefficient_array, self._zero_comp_indices, axis=0)
 
 
-    def calculate_covariance_matrix(self, target_signal, concurrent_fit=False):
+    def calculate_covariance_matrix(self, target_signal, concurrent_fit=False, use_cupy=False):
         '''Calculate covariance matrix after having performed Linear Regression
         '''
+        from time import time
+        t = time()
+        if use_cupy:
+            import cupy as cp
+            asnumpy = cp.asnumpy
+            asarray = cp.asarray
+            zeros = cp.zeros
+            inv = cp.linalg.inv
+            dot = cp.dot
+            matmul = cp.matmul
+        else:
+            asnumpy = np.asarray
+            asarray = np.asarray
+            zeros = np.zeros
+            inv = np.linalg.inv
+            dot = np.dot
+            matmul = np.matmul
         n = np.count_nonzero(self.channel_switches)  # the signal axis length
         k = self._component_data.shape[-2]  # the number of components
         
@@ -1020,24 +1037,23 @@ class BaseModel(list):
             nav_shape = self.axes_manager._navigation_shape_in_array
         else:
             nav_shape = ()
-        fit = np.zeros(nav_shape + (n, k))
         # Either component_data is the same across all nav, or not.
         # Keep nav_shape for later updates to linear fitting
         # For single pixels
-        for index in np.ndindex(nav_shape):
-            fit[index] = self._component_data.T * self.coefficient_array[index]
+        t = time()
+        target_signal = asarray(target_signal)
+        fit = asarray(self._component_data.T) * asarray(self.coefficient_array[..., None, :])
         res = target_signal - fit.sum(-1)  # The residual
-        res_dot = np.zeros(nav_shape)
-        for index in np.ndindex(nav_shape):
-            res_dot[index] = np.dot(res[index].T, res[index])
+        del target_signal
+        res_dot = (res*res).sum(-1)
+        self.res_dot = res_dot
 
-        fit_dot = np.matmul(fit.swapaxes(-2, -1), fit)
-        inv_fit_dot = np.linalg.inv(fit_dot)
-        covariance = np.zeros(nav_shape + (k, k))
-        for index in np.ndindex(nav_shape):
-            covariance[index] = (1 / (n - k)) * \
-                np.dot(res_dot[index], inv_fit_dot[index])
-        return covariance
+        fit_dot = matmul(fit.swapaxes(-2, -1), fit)
+        inv_fit_dot = inv(fit_dot)
+        self.inv_fit_dot = inv_fit_dot
+        covariance = zeros(nav_shape + (k, k))
+        self.covariance = (1 / (n - k)) * (res_dot * inv_fit_dot.T).T
+        return asnumpy(covariance)
 
     def _linear_fitting(self, algorithm='ridge_regression', concurrent_fit=False, **kwargs):
         """
@@ -1069,9 +1085,9 @@ class BaseModel(list):
         channels_signal_shape = np.count_nonzero(self.channel_switches)
         
         # nav_shape and comp_nav_shape may change with future linear fitting speedups
-        nav_shape = self.axes_manager._navigation_shape_in_array if concurrent_fit else ()
-        flat_nav_shape = (np.prod(self.axes_manager._navigation_shape_in_array), ) if concurrent_fit else ()
-
+        nav_shape = self.axes_manager._navigation_shape_in_array if concurrent_fit and self.signal.axes_manager.navigation_size else ()
+        flat_nav_shape = (np.prod(self.axes_manager._navigation_shape_in_array), ) if concurrent_fit and self.signal.axes_manager.navigation_size else ()
+        
         self._component_data = np.zeros((n_free_para, channels_signal_shape))
         self._component_data_fixed = np.zeros((channels_signal_shape, ))
         self.coefficient_array = np.zeros(flat_nav_shape +  (n_free_para, ))
@@ -1102,6 +1118,7 @@ class BaseModel(list):
         target_signal = target_signal.reshape(flat_nav_shape + (sig1Dshape,))
         target_signal = target_signal
         self._component_data = self._component_data
+        use_cupy = False
         if not import_sklearn.sklearn_installed or algorithm=='matrix_inversion':
             if algorithm != 'matrix_inversion':
                 warnings.warn(
@@ -1110,6 +1127,9 @@ class BaseModel(list):
                 "matrix inversion approach."
                 )
             self.coefficient_array[:] = linear_regression(target_signal, self._component_data)
+        elif algorithm=='cupy_matrix_inversion':
+            use_cupy = True
+            self.coefficient_array[:] = linear_regression(target_signal, self._component_data, use_cupy = use_cupy)
         elif algorithm == 'ridge_regression':
             ridge_regression_solver = kwargs.pop('solver', 'auto')
             ridge_regression_alpha = kwargs.pop('alpha', '0.0')
@@ -1120,7 +1140,7 @@ class BaseModel(list):
             raise ValueError("linear_algorithm {} not supported. Use 'ridge_regression' or 'matrix_inversion'.".format(algorithm))
         
         self.coefficient_array = self.coefficient_array.reshape(nav_shape + (component_data_shape[0], ))
-        covariance = self.calculate_covariance_matrix(target_signal.reshape(nav_shape + (sig1Dshape,)), concurrent_fit=concurrent_fit)
+        covariance = self.calculate_covariance_matrix(target_signal.reshape(nav_shape + (sig1Dshape,)), concurrent_fit=concurrent_fit, use_cupy=use_cupy)
         standard_error = standard_error_from_covariance(covariance)
         if concurrent_fit:
             j = 0 # counter to skip any zero-components
