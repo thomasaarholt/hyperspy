@@ -119,6 +119,11 @@ class TestLinearFitting:
         constant = c._compute_constant_term()
         np.testing.assert_array_almost_equal(constant, c.b.value)
 
+    def test_constant(self):
+        self.c.b.value = -5
+        self.c.b.free = False
+        assert self.c._constant_term == self.c.b.value
+
 class TestFitAlgorithms:
     def setup_method(self, method):
         self.s = EDS_SEM_Spectrum().isig[5.0:15.0]
@@ -130,7 +135,7 @@ class TestFitAlgorithms:
         m = self.m
         m.fit(linear_algorithm='ridge_regression')
         assert m._linear_algorithm == 'ridge_regression'
-        assert m._ridge_regression_alpha == 'auto'
+
         ridge_fit = m.as_signal()
 
         m.fit(linear_algorithm='matrix_inversion')
@@ -300,3 +305,24 @@ class TestLinearFitTwins:
         np.testing.assert_almost_equal(self.gs[1].A.value, -10)
         np.testing.assert_almost_equal(self.gs[2].A.value, 5)
         np.testing.assert_array_almost_equal((self.s - self.m.as_signal()).data, 0)
+
+class TestCompute:
+    def setup_method(self):
+        self.s = Signal1D(np.random.random(10))
+        m = self.s.create_model()
+        self.lin = Expression("a*x + b", name='linear')
+        m.append(self.lin)
+
+    def test_compute_component_zero(self):
+        np.testing.assert_array_almost_equal(self.lin._compute_component(), 0)
+
+    def test_compute_componen(self):
+        self.lin.a.value = 2
+        self.lin.b.value = 3
+        np.testing.assert_array_almost_equal(self.lin._compute_component(), 2*np.arange(self.s.axes_manager[-1].size) + 3)
+
+    def test_compute_constant(self):
+        self.lin.a.value = 2
+        self.lin.b.value = 3
+        self.lin.b.free = False
+        np.testing.assert_array_almost_equal(self.lin._compute_constant_term(), 3)

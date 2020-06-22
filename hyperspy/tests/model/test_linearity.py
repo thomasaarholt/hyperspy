@@ -19,6 +19,7 @@
 import numpy as np
 from hyperspy.components1d import Expression, Gaussian
 from hyperspy._signals.signal1d import Signal1D
+from hyperspy._components.expression import check_parameter_linearity
 class TestModelLinearity:
 
     def setup_method(self, method):
@@ -65,9 +66,16 @@ def test_gaussian_linear():
     assert not g.centre._is_linear
     assert not g.sigma._is_linear
 
-def test_if_parameter_is_offset():
-    from hyperspy._components.expression import check_if_parameter_is_offset
-    expr = 'ax + b'
+def test_parameter_linearity():
+    expr = "a*x**2 + b*x + c"
+    assert check_parameter_linearity(expr, 'a')
+    assert check_parameter_linearity(expr, 'b')
+    assert check_parameter_linearity(expr, 'c')
+    
+    expr = "a*sin(b*x)"
+    assert check_parameter_linearity(expr, 'a')
+    assert not check_parameter_linearity(expr, 'b')
 
-    assert not check_if_parameter_is_offset(expr, 'a')
-    assert check_if_parameter_is_offset(expr, 'b')
+    expr = "a*exp(-b*x)"
+    assert check_parameter_linearity(expr, 'a')
+    assert not check_parameter_linearity(expr, 'b')
