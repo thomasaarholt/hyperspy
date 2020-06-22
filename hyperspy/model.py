@@ -1104,7 +1104,9 @@ class BaseModel(list):
             self.coefficient_array[:] = linear_regression(target_signal, self._component_data)
         elif algorithm == 'ridge_regression':
             ridge_regression_solver = kwargs.pop('solver', 'auto')
-            ridge_regression_alpha = kwargs.pop('alpha', '0.0')
+            ridge_regression_alpha = kwargs.pop('alpha', 0.0)
+            self._ridge_regression_solver = ridge_regression_solver
+            self._ridge_regression_alpha = ridge_regression_alpha
 
             ridge_regression = import_sklearn.sklearn.linear_model._ridge.ridge_regression
             self.coefficient_array[:] = ridge_regression(self._component_data.T, target_signal, alpha = ridge_regression_alpha, solver = ridge_regression_solver)

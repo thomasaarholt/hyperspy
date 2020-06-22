@@ -130,7 +130,7 @@ class TestFitAlgorithms:
         m = self.m
         m.fit(linear_algorithm='ridge_regression')
         assert m._linear_algorithm == 'ridge_regression'
-        assert m._ridge_regression_alpha == 'auto'
+
         ridge_fit = m.as_signal()
 
         m.fit(linear_algorithm='matrix_inversion')
