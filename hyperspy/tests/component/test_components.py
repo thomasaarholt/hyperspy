@@ -27,7 +27,7 @@ from hyperspy.models.model1d import Model1D
 from hyperspy.misc.test_utils import ignore_warning
 from hyperspy import components1d
 from hyperspy.component import Component
-
+from hyperspy._components.expression import extract_constant_part_of_expression
 
 TRUE_FALSE_2_TUPLE = [p for p in itertools.product((True, False), repeat=2)]
 
