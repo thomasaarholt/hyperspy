@@ -24,6 +24,7 @@ import dask.array as da
 import traits.api as t
 from traits.trait_errors import TraitError
 import pint
+from pint.errors import UndefinedUnitError
 import logging
 
 from hyperspy.events import Events, Event
@@ -82,13 +83,14 @@ class UnitConversion:
         self.units = units
         self.scale = scale
         self.offset = units
+        
 
     def _ignore_conversion(self, units):
         if units == t.Undefined:
             return True
         try:
             _ureg(units)
-        except pint.errors.UndefinedUnitError:
+        except UndefinedUnitError:
             warnings.warn('Unit "{}" not supported for conversion. Nothing '
                           'done.'.format(units),
                           UserWarning)

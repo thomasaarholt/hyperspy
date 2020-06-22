@@ -36,7 +36,6 @@ from hyperspy.component import Component
 from hyperspy.ui_registry import add_gui_method
 from hyperspy.misc.test_utils import ignore_warning
 from hyperspy.drawing.figure import BlittedFigure
-from hyperspy.misc.array_tools import calculate_bins_histogram, numba_histogram
 from hyperspy.defaults_parser import preferences
 
 
@@ -678,6 +677,7 @@ class ImageContrastEditor(t.HasTraits):
         return self.image._current_data
 
     def _get_histogram(self, data):
+        from hyperspy.misc.array_tools import numba_histogram
         return numba_histogram(data, bins=self.bins,
                                ranges=(self._vmin, self._vmax))
 
@@ -689,6 +689,7 @@ class ImageContrastEditor(t.HasTraits):
                                               scale=self.xaxis[1]-self.xaxis[0])
 
     def plot_histogram(self):
+        from hyperspy.misc.array_tools import calculate_bins_histogram
         if self._vmin == self._vmax:
             return
         data = self._get_data()

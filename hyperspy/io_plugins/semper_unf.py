@@ -82,8 +82,6 @@ from datetime import datetime
 import numpy as np
 from traits.api import Undefined
 
-from hyperspy.misc.array_tools import sarray2dict
-
 
 _logger = logging.getLogger(__name__)
 
@@ -210,6 +208,8 @@ class SemperFormat(object):
 
     @classmethod
     def _read_label(cls, unf_file):
+        from hyperspy.misc.array_tools import sarray2dict
+
         unpack = partial(
             unpack_from_intbytes,
             '<f')  # Unpacking function for 4 byte floats!
@@ -373,6 +373,8 @@ class SemperFormat(object):
             SEMPER file format object containing the loaded information.
 
         """
+        from hyperspy.misc.array_tools import sarray2dict
+
         metadata = OrderedDict()
         with open(filename, 'rb') as f:
             # Read header:

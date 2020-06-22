@@ -24,7 +24,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import constants
 
-from hyperspy.misc.array_tools import rebin
 from hyperspy.misc.elements import elements as elements_db
 import hyperspy.defaults_parser
 
@@ -37,6 +36,8 @@ def _estimate_gain(ns, cs,
                    plot_results=False,
                    binning=0,
                    pol_order=1):
+    from hyperspy.misc.array_tools import rebin
+
     if binning > 0:
         factor = 2 ** binning
         remainder = np.mod(ns.shape[1], factor)

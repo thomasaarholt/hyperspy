@@ -42,7 +42,6 @@ import struct
 import io
 from datetime import datetime
 from dateutil import tz
-import tifffile
 from hyperspy.misc import rgb_tools
 import xml.etree.ElementTree as ET
 
@@ -159,6 +158,7 @@ class ElidReader:
             return float(item)
 
     def _read_tiff(self):
+        import tifffile
 
         def xml_element_to_dict(element):
             dict = {}

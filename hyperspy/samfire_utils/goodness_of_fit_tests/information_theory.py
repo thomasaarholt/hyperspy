@@ -16,7 +16,6 @@
 # You should have received a copy of the GNU General Public License
 # along with  HyperSpy.  If not, see <http://www.gnu.org/licenses/>.
 
-from hyperspy.utils.model_selection import AIC, AICc, BIC
 import numpy as np
 
 
@@ -41,6 +40,8 @@ class AIC_test(object):
         self.expected = 0.
 
     def test(self, model, ind):
+        from hyperspy.utils.model_selection import AIC
+
         m = model.inav[ind[::-1]]
         m.fetch_stored_values()
         _aic = AIC(m)
@@ -64,6 +65,8 @@ class AICc_test(object):
         self.expected = 0.
 
     def test(self, model, ind):
+        from hyperspy.utils.model_selection import AICc
+
         m = model.inav[ind[::-1]]
         m.fetch_stored_values()
         _aicc = AICc(m)
@@ -87,6 +90,8 @@ class BIC_test(object):
         self.expected = 0.
 
     def test(self, model, ind):
+        from hyperspy.utils.model_selection import BIC
+
         m = model.inav[ind[::-1]]
         m.fetch_stored_values()
         _bic = BIC(m)

@@ -18,7 +18,6 @@
 
 from functools import wraps
 import numpy as np
-import sympy
 import warnings
 
 from hyperspy.component import Component
@@ -52,6 +51,7 @@ def _fill_function_args_2d(fn):
 
 
 def _parse_substitutions(string):
+    import sympy
     splits = map(str.strip, string.split(';'))
     expr = sympy.sympify(next(splits))
     # We substitute one by one manually, as passing all at the same time does
@@ -61,6 +61,13 @@ def _parse_substitutions(string):
         expr = expr.subs(t[0], sympy.sympify(t[1]))
     return expr
 
+
+def check_sympy_version_for_component(sympy_minimum_version="1.3", component_name=""):
+    import sympy
+    from distutils.version import LooseVersion
+    if LooseVersion(sympy.__version__) < LooseVersion(sympy_minimum_version):
+        raise ImportError("The `{}` component requires "
+                            "SymPy >= {}".format(component_name, sympy_minimum_version))
 
 class Expression(Component):
 
@@ -150,6 +157,7 @@ class Expression(Component):
          <Parameter two of my function component>)
 
         """
+        import sympy
         self._add_rotation = add_rotation
         self._str_expression = expression
         self._rename_pars = rename_pars
@@ -198,7 +206,6 @@ class Expression(Component):
         Useful to recompile the function and gradient with a different module.
         """
         import sympy
-        from sympy.utilities.lambdify import lambdify
         try:  # Expression is just a constant
             float(self._str_expression)
         except ValueError:
@@ -248,7 +255,7 @@ class Expression(Component):
         parameters.sort(key=lambda x: x.name)  # to have a reliable order
         # Create compiled function
         variables = [x, y] if self._is2D else [x]
-        self._f = lambdify(variables + parameters, eval_expr,
+        self._f = sympy.lambdify(variables + parameters, eval_expr,
                            modules=module, dummify=False)
 
         if self._is2D:
@@ -271,7 +278,7 @@ class Expression(Component):
                         parameter.name]
                     setattr(self,
                             "_f_grad_%s" % name,
-                            lambdify(variables + parameters,
+                            sympy.lambdify(variables + parameters,
                                      grad_expr.evalf(),
                                      modules=module,
                                      dummify=False)

@@ -17,11 +17,7 @@
 # along with  HyperSpy.  If not, see <http://www.gnu.org/licenses/>.
 
 """This module provides tools to interact with The EELS Database."""
-import requests
 import logging
-
-from hyperspy.io_plugins.msa import parse_msa_string
-from hyperspy.io import dict2signal
 
 _logger = logging.getLogger(__name__)
 
@@ -125,6 +121,10 @@ def eelsdb(spectrum_type=None, title=None, author=None, element=None, formula=No
         any.
 
     """
+    from hyperspy.io import dict2signal
+    from hyperspy.io_plugins.msa import parse_msa_string
+    import requests
+
     # Verify arguments
     if spectrum_type is not None and spectrum_type not in {
             'coreloss', 'lowloss', 'zeroloss', 'xrayabs'}:

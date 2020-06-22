@@ -22,8 +22,6 @@ import numpy as np
 from dask.array import Array as dArray
 import traits.api as t
 from traits.trait_numeric import Array
-import sympy
-from sympy.utilities.lambdify import lambdify
 from distutils.version import LooseVersion
 
 import hyperspy
@@ -34,7 +32,6 @@ from hyperspy.misc.export_dictionary import export_to_dictionary, \
     load_from_dictionary
 from hyperspy.events import Events, Event
 from hyperspy.ui_registry import add_gui_method
-from IPython.display import display_pretty, display
 from hyperspy.misc.model_tools import current_component_values
 from hyperspy.misc.utils import get_object_package_info
 
@@ -144,6 +141,8 @@ class Parameter(t.HasTraits):
     _twin_inverse_sympy = None
 
     def __init__(self):
+        import sympy
+        self.sympy = sympy
         self._twins = set()
         self.events = Events()
         self.events.value_changed = Event("""
@@ -234,20 +233,20 @@ class Parameter(t.HasTraits):
             self._twin_function_expr = ""
             self._twin_inverse_sympy = None
             return
-        expr = sympy.sympify(value)
+        expr = self.sympy.sympify(value)
         if len(expr.free_symbols) > 1:
             raise ValueError("The expression must contain only one variable.")
         elif len(expr.free_symbols) == 0:
             raise ValueError("The expression must contain one variable, "
                              "it contains none.")
         x = tuple(expr.free_symbols)[0]
-        self.twin_function = lambdify(x, expr.evalf())
+        self.twin_function = self.sympy.lambdify(x, expr.evalf())
         self._twin_function_expr = value
         if not self.twin_inverse_function:
-            y = sympy.Symbol(x.name + "2")
+            y = self.sympy.Symbol(x.name + "2")
             try:
-                inv = list(sympy.solveset(sympy.Eq(y, expr), x))
-                self._twin_inverse_sympy = lambdify(y, inv)
+                inv = list(self.sympy.solveset(self.sympy.Eq(y, expr), x))
+                self._twin_inverse_sympy = self.sympy.lambdify(y, inv)
                 self._twin_inverse_function = None
             except BaseException:
                 # Not all may have a suitable solution.
@@ -272,14 +271,14 @@ class Parameter(t.HasTraits):
             self.twin_inverse_function = None
             self._twin_inverse_function_expr = ""
             return
-        expr = sympy.sympify(value)
+        expr = self.sympy.sympify(value)
         if len(expr.free_symbols) > 1:
             raise ValueError("The expression must contain only one variable.")
         elif len(expr.free_symbols) == 0:
             raise ValueError("The expression must contain one variable, "
                              "it contains none.")
         x = tuple(expr.free_symbols)[0]
-        self._twin_inverse_function = lambdify(x, expr.evalf())
+        self._twin_inverse_function = self.sympy.lambdify(x, expr.evalf())
         self._twin_inverse_function_expr = value
 
     @property
@@ -1219,6 +1218,8 @@ class Component(t.HasTraits):
         fancy : bool
             If True, attempts to print using html rather than text in the notebook.
         """
+        from IPython.display import display_pretty, display
+
         if fancy:
             display(current_component_values(self, only_free=only_free))
         else:

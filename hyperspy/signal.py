@@ -23,7 +23,6 @@ import inspect
 from contextlib import contextmanager
 from datetime import datetime
 import logging
-from pint import UnitRegistry, UndefinedUnitError
 
 import numpy as np
 import scipy as sp
@@ -33,7 +32,6 @@ import traits.api as t
 import numbers
 
 from hyperspy.axes import AxesManager
-from hyperspy import io
 from hyperspy.drawing import mpl_hie, mpl_hse, mpl_he
 from hyperspy.learn.mva import MVA, LearningResults
 import hyperspy.misc.utils
@@ -2212,6 +2210,8 @@ class BaseSignal(FancySlicing,
             iii) ``'hspy'`` (the default extension)
 
         """
+        from hyperspy import io
+
         if filename is None:
             if (self.tmp_parameters.has_item('filename') and
                     self.tmp_parameters.has_item('folder')):
@@ -3454,6 +3454,7 @@ class BaseSignal(FancySlicing,
         For further information see the documentation of
         :py:func:`numpy.fft.fftn`
         """
+        from pint import UnitRegistry, UndefinedUnitError
 
         if self.axes_manager.signal_dimension == 0:
             raise AttributeError("Signal dimension must be at least one.")
@@ -3555,6 +3556,7 @@ class BaseSignal(FancySlicing,
         For further information see the documentation of
         :py:func:`numpy.fft.ifftn`
         """
+        from pint import UnitRegistry, UndefinedUnitError
 
         if self.axes_manager.signal_dimension == 0:
             raise AttributeError("Signal dimension must be at least one.")
@@ -4691,8 +4693,9 @@ class BaseSignal(FancySlicing,
     as_signal2D.__doc__ %= (OUT_ARG, OPTIMIZE_ARG.replace('False', 'True'))
 
     def _assign_subclass(self):
+        from hyperspy.io import assign_signal_subclass
         mp = self.metadata
-        self.__class__ = hyperspy.io.assign_signal_subclass(
+        self.__class__ = assign_signal_subclass(
             dtype=self.data.dtype,
             signal_dimension=self.axes_manager.signal_dimension,
             signal_type=mp.Signal.signal_type

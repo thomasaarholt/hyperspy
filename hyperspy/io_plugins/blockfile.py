@@ -24,7 +24,6 @@ import warnings
 import datetime
 import dateutil
 
-from hyperspy.misc.array_tools import sarray2dict, dict2sarray
 from hyperspy.misc.date_time_tools import serial_date_to_ISO_format, datetime_to_serial_date
 
 _logger = logging.getLogger(__name__)
@@ -99,6 +98,8 @@ def get_default_header(endianess='<'):
 
 
 def get_header_from_signal(signal, endianess='<'):
+    from hyperspy.misc.array_tools import dict2sarray
+
     header = get_default_header(endianess)
     if 'blockfile_header' in signal.original_metadata:
         header = dict2sarray(signal.original_metadata['blockfile_header'],
@@ -147,6 +148,8 @@ def get_header_from_signal(signal, endianess='<'):
 
 def file_reader(filename, endianess='<', mmap_mode=None,
                 lazy=False, **kwds):
+    from hyperspy.misc.array_tools import sarray2dict
+
     _logger.debug("Reading blockfile: %s" % filename)
     metadata = {}
     if mmap_mode is None:

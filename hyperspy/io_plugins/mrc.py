@@ -26,8 +26,6 @@ import logging
 import numpy as np
 from traits.api import Undefined
 
-from hyperspy.misc.array_tools import sarray2dict
-
 _logger = logging.getLogger(__name__)
 
 
@@ -137,6 +135,8 @@ def get_data_type(index, endianess='<'):
 
 
 def file_reader(filename, endianess='<', **kwds):
+    from hyperspy.misc.array_tools import sarray2dict
+
     metadata = {}
     f = open(filename, 'rb')
     std_header = np.fromfile(f, dtype=get_std_dtype_list(endianess),

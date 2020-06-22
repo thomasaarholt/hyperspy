@@ -36,10 +36,8 @@ import h5py
 import numpy as np
 import dask.array as da
 from dateutil import tz
-import pint
 
 from hyperspy.misc.elements import atomic_number2name
-import hyperspy.misc.io.fei_stream_readers as stream_readers
 
 # Plugin characteristics
 # ----------------------
@@ -561,6 +559,8 @@ class FeiEMDReader(object):
                  lazy=False):
         # TODO: Finish lazy implementation using the `FrameLocationTable`
         # Parallelise streams reading
+        import pint
+        
         self.filename = filename
         self.ureg = pint.UnitRegistry()
         self.dictionaries = []
@@ -1127,6 +1127,8 @@ class FeiSpectrumStream(object):
     """
 
     def __init__(self, stream_group, reader):
+        import hyperspy.misc.io.fei_stream_readers as stream_readers
+        self.stream_readers = stream_readers
         self.reader = reader
         self.stream_group = stream_group
         # Parse acquisition settings to get bin_count and dtype
@@ -1190,7 +1192,7 @@ class FeiSpectrumStream(object):
         # Here we load the stream data into memory, which is fine is the
         # arrays are small. We could load them lazily when lazy.
         stream_data = self.stream_group['Data'][:].T[0]
-        sparse_array = stream_readers.stream_to_sparse_COO_array(
+        sparse_array = self.stream_readers.stream_to_sparse_COO_array(
             stream_data=stream_data,
             spatial_shape=self.reader.spatial_shape,
             first_frame=self.reader.first_frame,
@@ -1212,7 +1214,7 @@ class FeiSpectrumStream(object):
             Otherwise it creates a new array and returns it.
 
         """
-        spectrum_image = stream_readers.stream_to_array(
+        spectrum_image = self.stream_readers.stream_to_array(
             stream=stream_data,
             spatial_shape=self.reader.spatial_shape,
             channels=self.bin_count,

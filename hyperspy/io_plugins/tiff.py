@@ -20,9 +20,6 @@ import os
 import logging
 from datetime import datetime, timedelta
 from dateutil import parser
-import pint
-from tifffile import imwrite, TiffFile, TIFF
-import tifffile
 import traits.api as t
 import numpy as np
 from distutils.version import LooseVersion
@@ -66,8 +63,6 @@ axes_label_codes = {
     '_': t.Undefined}
 
 
-ureg = pint.UnitRegistry()
-
 
 def file_writer(filename, signal, export_scale=True, extratags=[], **kwds):
     """Writes data to tif using Christoph Gohlke's tifffile library
@@ -81,6 +76,7 @@ def file_writer(filename, signal, export_scale=True, extratags=[], **kwds):
         Export the scale and the units (compatible with DM and ImageJ) to
         appropriate tags.
     """
+    from tifffile import imwrite
     _logger.debug('************* Saving *************')
     data = signal.data
     if signal.is_rgbx is True:
@@ -130,7 +126,8 @@ def file_reader(filename, record_by='image', force_read_resolution=False,
         See http://www.awaresystems.be/imaging/tiff/tifftags/resolutionunit.html
     **kwds, optional
     """
-
+    from tifffile import TiffFile, TIFF
+    import tifffile
     _logger.debug('************* Loading *************')
     # For testing the use of local and skimage tifffile library
 
@@ -252,6 +249,8 @@ def _load_data(TF, filename, is_rgb, sl=None, memmap=None, **kwds):
 
 
 def _parse_scale_unit(tiff, op, shape, force_read_resolution):
+    from tifffile import TIFF
+
     axes_l = ['x', 'y', 'z']
     scales = {axis: 1.0 for axis in axes_l}
     offsets = {axis: 0.0 for axis in axes_l}
@@ -491,6 +490,8 @@ def _parse_tuple_Zeiss(tup):
 
 
 def _parse_tuple_Zeiss_with_units(tup, to_units=None):
+    import pint
+    ureg = pint.UnitRegistry()
     (value, parse_units) = tup[1:]
     if to_units is not None:
         v = value * ureg(parse_units)

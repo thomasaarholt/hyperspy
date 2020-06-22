@@ -19,10 +19,8 @@
 import numpy.testing as nt
 import traits.api as t
 import pytest
-
 from hyperspy.axes import DataAxis, AxesManager, UnitConversion, _ureg
 from hyperspy.misc.test_utils import assert_warns, assert_deep_almost_equal
-
 
 class TestUnitConversion:
 

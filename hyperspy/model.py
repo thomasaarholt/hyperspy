@@ -50,7 +50,6 @@ import warnings
 from hyperspy.exceptions import VisibleDeprecationWarning
 from hyperspy.ui_registry import add_gui_method
 from hyperspy.misc.model_tools import current_model_values
-from IPython.display import display_pretty, display
 from hyperspy.docstrings.signal import SHOW_PROGRESSBAR_ARG, PARALLEL_ARG, MAX_WORKERS_ARG
 
 _logger = logging.getLogger(__name__)
@@ -1575,6 +1574,8 @@ class BaseModel(list):
         fancy : bool
             If True, attempts to print using html rather than text in the notebook.
         """
+        from IPython.display import display_pretty, display
+
         if fancy:
             display(current_model_values(
                 model=self, only_free=only_free, only_active=only_active,

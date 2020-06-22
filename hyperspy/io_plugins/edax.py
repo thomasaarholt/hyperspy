@@ -23,7 +23,6 @@
 import os
 import logging
 import numpy as np
-from hyperspy.misc.array_tools import sarray2dict
 import traits.api as t
 from hyperspy.misc.elements import atomic_number2name
 
@@ -761,6 +760,9 @@ def spc_reader(filename,
         list with dictionary of signal information to be passed back to
         hyperspy.io.load_with_reader
     """
+
+    from hyperspy.misc.array_tools import sarray2dict
+
     with open(filename, 'rb') as f:
         _logger.debug(' Reading {}'.format(filename))
         spc_header = __get_spc_header(f, endianess, load_all_spc)
@@ -846,6 +848,8 @@ def spd_reader(filename,
         list with dictionary of signal information to be passed back to
         hyperspy.io.load_with_reader
     """
+    from hyperspy.misc.array_tools import sarray2dict
+
     with open(filename, 'rb') as f:
         spd_header = np.fromfile(f,
                                  dtype=get_spd_dtype_list(endianess),

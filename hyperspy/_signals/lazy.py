@@ -31,9 +31,7 @@ from ..signal import BaseSignal
 from ..misc.utils import multiply, dummy_context_manager
 from ..external.progressbar import progressbar
 from ..external.astroML.histtools import dasky_histogram
-from hyperspy.misc.array_tools import _requires_linear_rebin
 from hyperspy.exceptions import VisibleDeprecationWarning
-from hyperspy.misc.machine_learning import import_sklearn
 
 _logger = logging.getLogger(__name__)
 
@@ -290,6 +288,8 @@ class LazySignal(BaseSignal):
 
     def rebin(self, new_shape=None, scale=None,
               crop=False, out=None, rechunk=True):
+        from hyperspy.misc.array_tools import _requires_linear_rebin
+
         factors = self._validate_rebin_args_and_get_factors(
             new_shape=new_shape,
             scale=scale)
@@ -765,6 +765,7 @@ class LazySignal(BaseSignal):
 
         # LEARN
         if algorithm == "pca":
+            from hyperspy.misc.machine_learning import import_sklearn
             if not import_sklearn.sklearn_installed:
                 raise ImportError("algorithm='pca' requires scikit-learn")
 

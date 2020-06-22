@@ -23,7 +23,7 @@ import logging
 import traits.api as t
 import numpy as np
 from scipy import constants
-import pint
+
 
 from hyperspy.signal import BaseSetMetadataItems
 from hyperspy import utils
@@ -770,6 +770,7 @@ class EDSTEM_mixin:
         100.0
 
         """
+        import pint
         if navigation_axes is None:
             navigation_axes = self.axes_manager.navigation_axes
         elif not isiterable(navigation_axes):

@@ -19,9 +19,7 @@
 import numpy as np
 import dask.array as da
 
-from hyperspy._components.expression import Expression
-from distutils.version import LooseVersion
-import sympy
+from hyperspy._components.expression import Expression, check_sympy_version_for_component
 
 sqrt2pi = np.sqrt(2 * np.pi)
 
@@ -148,9 +146,7 @@ class SkewNormal(Expression):
 
     def __init__(self, x0=0., A=1., scale=1., shape=0.,
                  module=['numpy', 'scipy'], **kwargs):
-        if LooseVersion(sympy.__version__) < LooseVersion("1.3"):
-            raise ImportError("The `SkewNormal` component requires "
-                              "SymPy >= 1.3")
+        check_sympy_version_for_component("1.3", 'SkewNormal')
         super(SkewNormal, self).__init__(
             expression="2 * A * normpdf * normcdf; normpdf = exp(- t ** 2 / 2) \
                 / sqrt(2 * pi); normcdf = (1 + erf(shape * t / sqrt(2))) / 2; \

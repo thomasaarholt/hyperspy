@@ -28,13 +28,6 @@ from matplotlib.ticker import FuncFormatter, MaxNLocator
 
 import hyperspy.misc.io.tools as io_tools
 from hyperspy.exceptions import VisibleDeprecationWarning
-from hyperspy.learn.mlpca import mlpca
-from hyperspy.learn.ornmf import ornmf
-from hyperspy.learn.orthomax import orthomax
-from hyperspy.learn.rpca import orpca, rpca_godec
-from hyperspy.learn.svd_pca import svd_pca
-from hyperspy.learn.whitening import whiten_data
-from hyperspy.misc.machine_learning import import_sklearn
 from hyperspy.misc.utils import ordinal, stack
 
 try:
@@ -47,15 +40,19 @@ except ImportError:
 
 _logger = logging.getLogger(__name__)
 
+def get_decomposition_algorithms():
+    from hyperspy.misc.machine_learning import import_sklearn
 
-if import_sklearn.sklearn_installed:
-    decomposition_algorithms = {
-        "sklearn_pca": import_sklearn.sklearn.decomposition.PCA,
-        "nmf": import_sklearn.sklearn.decomposition.NMF,
-        "sparse_pca": import_sklearn.sklearn.decomposition.SparsePCA,
-        "mini_batch_sparse_pca": import_sklearn.sklearn.decomposition.MiniBatchSparsePCA,
-        "sklearn_fastica": import_sklearn.sklearn.decomposition.FastICA,
-    }
+    if import_sklearn.sklearn_installed:
+        return {
+            "sklearn_pca": import_sklearn.sklearn.decomposition.PCA,
+            "nmf": import_sklearn.sklearn.decomposition.NMF,
+            "sparse_pca": import_sklearn.sklearn.decomposition.SparsePCA,
+            "mini_batch_sparse_pca": import_sklearn.sklearn.decomposition.MiniBatchSparsePCA,
+            "sklearn_fastica": import_sklearn.sklearn.decomposition.FastICA,
+        }
+    else:
+        return None
 
 
 def _get_derivative(signal, diff_axes, diff_order):
@@ -219,6 +216,11 @@ class MVA:
         * :py:meth:`~._signals.lazy.LazySignal.decomposition` for lazy signals
 
         """
+        from hyperspy.learn.mlpca import mlpca
+        from hyperspy.learn.ornmf import ornmf
+        from hyperspy.learn.rpca import orpca, rpca_godec
+        from hyperspy.learn.svd_pca import svd_pca
+
         # Check data is suitable for decomposition
         if self.data.dtype.char not in np.typecodes["AllFloat"]:
             raise TypeError(
@@ -282,12 +284,13 @@ class MVA:
             "mini_batch_sparse_pca",
         ]
         if algorithm in algorithms_sklearn:
+            from hyperspy.misc.machine_learning import import_sklearn
             if not import_sklearn.sklearn_installed:
                 raise ImportError(f"algorithm='{algorithm}' requires scikit-learn")
 
             # Initialize the sklearn estimator
             is_sklearn_like = True
-            estim = decomposition_algorithms[algorithm](
+            estim = get_decomposition_algorithms()[algorithm](
                 n_components=output_dimension, **kwargs
             )
 
@@ -722,6 +725,8 @@ class MVA:
 
         """
         from hyperspy.signal import BaseSignal
+        from hyperspy.learn.whitening import whiten_data
+        from hyperspy.learn.orthomax import orthomax
 
         lr = self.learning_results
 
@@ -818,6 +823,7 @@ class MVA:
         is_sklearn_like = False
         algorithms_sklearn = ["sklearn_fastica"]
         if algorithm in algorithms_sklearn:
+            from hyperspy.misc.machine_learning import import_sklearn
             if not import_sklearn.sklearn_installed:
                 raise ImportError(f"algorithm='{algorithm}' requires scikit-learn")
 
@@ -827,7 +833,7 @@ class MVA:
 
             # Initialize the sklearn estimator
             is_sklearn_like = True
-            estim = decomposition_algorithms[algorithm](**kwargs)
+            estim = get_decomposition_algorithms()[algorithm](**kwargs)
 
             # Check whiten argument
             if estim.whiten and whiten_method is not None:

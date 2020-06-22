@@ -26,11 +26,6 @@ import scipy.interpolate
 import scipy as sp
 from scipy.signal import savgol_filter
 from scipy.ndimage.filters import gaussian_filter1d
-try:
-    from statsmodels.nonparametric.smoothers_lowess import lowess
-    statsmodels_installed = True
-except BaseException:
-    statsmodels_installed = False
 
 from hyperspy.signal import BaseSignal
 from hyperspy._signals.common_signal1d import CommonSignal1D
@@ -976,6 +971,11 @@ class Signal1D(BaseSignal, CommonSignal1D):
         This method uses the lowess algorithm from the `statsmodels` library, 
         which needs to be installed to use this method.
         """
+        try:
+            from statsmodels.nonparametric.smoothers_lowess import lowess
+            statsmodels_installed = True
+        except BaseException:
+            statsmodels_installed = False
         if not statsmodels_installed:
             raise ImportError("statsmodels is not installed. This package is "
                               "required for this feature.")

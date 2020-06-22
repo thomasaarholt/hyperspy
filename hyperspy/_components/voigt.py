@@ -20,9 +20,8 @@ import math
 import numpy as np
 import sympy
 
-from hyperspy._components.expression import Expression
+from hyperspy._components.expression import Expression, check_sympy_version_for_component
 from hyperspy._components.gaussian import _estimate_gaussian_parameters
-from distutils.version import LooseVersion
 
 sqrt2pi = math.sqrt(2 * math.pi)
 sigma2fwhm = 2 * math.sqrt(2 * math.log(2))
@@ -88,9 +87,8 @@ class Voigt(Expression):
         # Not to break scripts once we remove the legacy Voigt
         if "legacy" in kwargs:
             del kwargs["legacy"]
-        if LooseVersion(sympy.__version__) < LooseVersion("1.3"):
-            raise ImportError("The `Voigt` component requires "
-                              "SymPy >= 1.3")
+        
+        check_sympy_version_for_component("1.3", "Voigt")
         # We use `_gamma` internally to workaround the use of the `gamma`
         # function in sympy
         super(Voigt, self).__init__(

@@ -16,7 +16,6 @@
 # You should have received a copy of the GNU General Public License
 # along with  HyperSpy.  If not, see <http://www.gnu.org/licenses/>.
 
-from hyperspy.misc.array_tools import are_aligned
 from itertools import zip_longest
 import numpy as np
 import dask.array as da
@@ -39,6 +38,8 @@ def _get_shapes(am, ignore_axis):
 
 
 def are_signals_aligned(*args, ignore_axis=None):
+    from hyperspy.misc.array_tools import are_aligned
+
     if len(args) < 2:
         raise ValueError(
             "This function requires at least two signal instances")

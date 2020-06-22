@@ -28,7 +28,6 @@ from collections import OrderedDict
 import numpy as np
 import traits.api as t
 
-from hyperspy.misc.array_tools import sarray2dict
 from hyperspy.misc.utils import DictionaryTreeBrowser, multiply
 
 _logger = logging.getLogger(__name__)
@@ -472,6 +471,8 @@ def ser_reader(filename, objects=None, lazy=False, only_valid_data=False):
     required format.
 
     """
+    from hyperspy.misc.array_tools import sarray2dict
+
     header, data = load_ser_file(filename)
     record_by = guess_record_by(header['DataTypeID'])
     ndim = int(header['NumberDimensions'])

@@ -21,7 +21,6 @@ from collections import OrderedDict
 import scipy.constants as constants
 import numpy as np
 from dask.array import Array as daArray
-from pint import UnitRegistry, UndefinedUnitError
 
 from hyperspy._signals.signal2d import Signal2D
 from hyperspy.signal import BaseSignal
@@ -675,6 +674,7 @@ class HologramImage(Signal2D):
         'Fringe sampling (px)': 3.7902017241882331,
         'Carrier frequency (1 / nm)': 0.28685808994016415}
         """
+        from pint import UnitRegistry, UndefinedUnitError
 
         # Testing match of navigation axes of reference and self
         # (exception: reference nav_dim=1):
