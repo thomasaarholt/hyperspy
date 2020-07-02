@@ -19,6 +19,7 @@
 import numpy as np
 import dask.array as da
 
+
 def _is_iter(val):
     "Checks if value is a list or tuple"
     return isinstance(val, tuple) or isinstance(val, list)
@@ -183,29 +184,27 @@ def linear_regression(y, component_data, use_cupy=False):
     # Setting the following will be convenient for future dask/lazy support
     import numpy as np
     use_dask = False
-
     if use_cupy:
+        if isinstance(y, da.Array):
+            use_dask = True
         import cupy as cp
         asarray = cp.asarray
-        asnumpy = cp.asnumpy
+        ascpu = cp.asnumpy
         matmul = cp.matmul
         inv = cp.linalg.inv
         dot = cp.dot
 
-    elif "dask" in str(type(y)):
+    elif isinstance(y, da.Array):
         use_dask = True
-        print('dask?')
-        import dask as da
-        asnumpy = np.asarray
-        asarray = da.array.asarray
-        matmul = da.array.matmul
-        inv = da.array.linalg.inv
-        dot = da.array.dot
+        ascpu = da.asarray
+        asarray = da.asarray
+        matmul = da.matmul
+        inv = da.linalg.inv
+        dot = da.dot
 
     else:
-        print('numpy?')
         asarray = np.asarray
-        asnumpy = np.asarray
+        ascpu = np.asarray
         matmul = np.matmul
         inv = np.linalg.inv
         dot = np.dot
@@ -217,23 +216,18 @@ def linear_regression(y, component_data, use_cupy=False):
     square_inv = inv(square)
     component_data2 = matmul(square_inv, component_data)
     fit_coefficients = dot(y, component_data2.T)
-    if use_dask:
-        from dask.diagnostics import ProgressBar
-        with ProgressBar():
-            fit_coefficients = fit_coefficients.compute()
-    return asnumpy(fit_coefficients)
+    return ascpu(fit_coefficients)
 
 
 def standard_error_from_covariance(covariance):
     'Get standard error coefficients from the diagonal of the covariance'
-    # dask diag only supports 2D arrays, so we cannot use diag (for now)
-    # if isinstance(data, da.Array):
-    #     sqrt = da.sqrt
-    #     diag = da.diag
-    # else:
-    #     sqrt = np.sqrt
-    #     diag = np.diag
-    standard_error = np.sqrt(np.diagonal(covariance, axis1=-2, axis2=-1))
+    if isinstance(covariance, da.Array):
+        sqrt = da.sqrt
+        diagonal = da.diagonal
+    else:
+        sqrt = np.sqrt
+        diagonal = np.diagonal
+    standard_error = sqrt(diagonal(covariance, axis1=-2, axis2=-1))
     return standard_error
 
 

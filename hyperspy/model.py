@@ -25,6 +25,7 @@ from distutils.version import LooseVersion
 import importlib
 
 import numpy as np
+import dask.array as da
 import dill
 import scipy
 import scipy.odr as odr
@@ -32,7 +33,7 @@ from scipy.optimize import leastsq, least_squares, minimize, differential_evolut
 from scipy.linalg import svd
 from contextlib import contextmanager
 
-from hyperspy.external.progressbar import progressbar
+from hyperspy.external.progressbar import progressbar, progressbar_dask
 from hyperspy.defaults_parser import preferences
 from hyperspy.external.mpfit.mpfit import mpfit
 from hyperspy.component import Component
@@ -1014,19 +1015,28 @@ class BaseModel(list):
         '''Calculate covariance matrix after having performed Linear Regression
         '''
         from time import time
-        t = time()
+        use_dask = False
         if use_cupy:
+            if isinstance(target_signal, da.Array):
+                use_dask = True
             import cupy as cp
-            asnumpy = cp.asnumpy
+            tocpu = cp.asnumpy
             asarray = cp.asarray
-            zeros = cp.zeros
             inv = cp.linalg.inv
             dot = cp.dot
             matmul = cp.matmul
+
+        elif isinstance(target_signal, da.Array):
+            use_dask = True
+            tocpu = da.asarray
+            asarray = da.asarray
+            matmul = da.matmul
+            inv = da.linalg.inv
+            dot = da.dot
+
         else:
-            asnumpy = np.asarray
+            tocpu = np.asarray
             asarray = np.asarray
-            zeros = np.zeros
             inv = np.linalg.inv
             dot = np.dot
             matmul = np.matmul
@@ -1040,20 +1050,41 @@ class BaseModel(list):
         # Either component_data is the same across all nav, or not.
         # Keep nav_shape for later updates to linear fitting
         # For single pixels
-        t = time()
         target_signal = asarray(target_signal)
+        #print('old chunk size', target_signal.chunks)
+        shape = target_signal.shape
+        chunk_size = (4000*4000) // np.prod(shape[-2:])
+        #print('estimated chunk size', chunk_size)
+        target_signal = target_signal.rechunk((chunk_size,) + shape[-2:])
+        #print('new chunk size', target_signal.chunks)
         fit = asarray(self._component_data.T) * asarray(self.coefficient_array[..., None, :])
+        fit = fit.rechunk((1,) + fit.shape[1:])
+        #print('target', target_signal.shape, target_signal.chunks)
+        #print('fit', fit.shape, fit.chunks)
+
         res = target_signal - fit.sum(-1)  # The residual
         del target_signal
         res_dot = (res*res).sum(-1)
-        self.res_dot = res_dot
 
         fit_dot = matmul(fit.swapaxes(-2, -1), fit)
-        inv_fit_dot = inv(fit_dot)
-        self.inv_fit_dot = inv_fit_dot
-        covariance = zeros(nav_shape + (k, k))
-        self.covariance = (1 / (n - k)) * (res_dot * inv_fit_dot.T).T
-        return asnumpy(covariance)
+        if use_dask and use_cupy:
+            shape = fit_dot.shape
+            fit_dot = fit_dot.reshape((-1,) + fit_dot.shape[-2:])
+            inv_fit_dot = asarray([inv(d) for d in fit_dot]) # dask inv and cupy inv are 2D only
+            inv_fit_dot = inv_fit_dot.reshape(shape)
+        elif use_dask:
+            shape = fit_dot.shape
+            fit_dot = fit_dot.reshape((-1,) + shape[-2:])
+            chunk_size = (4000*4000) // np.prod(shape[-2:]) # dask recommended chunksize
+            fit_dot = fit_dot.rechunk((chunk_size,) + shape[-2:])
+            print('cs', chunk_size, (chunk_size,) + shape[-2:])
+            print('fd', fit_dot.shape, fit_dot.chunks)
+            inv_fit_dot = np.linalg._umath_linalg.inv(fit_dot, output_dtypes=fit_dot.dtype)
+            inv_fit_dot = inv_fit_dot.reshape(shape)
+        else:
+            inv_fit_dot = inv(fit_dot)
+        covariance = (1 / (n - k)) * (res_dot * inv_fit_dot.T).T
+        return tocpu(covariance)
 
     def _linear_fitting(self, algorithm='ridge_regression', concurrent_fit=False, **kwargs):
         """
@@ -1126,7 +1157,11 @@ class BaseModel(list):
                 "Install scikit-learn (sklearn) to use it. Proceding using a more fragile "
                 "matrix inversion approach."
                 )
-            self.coefficient_array[:] = linear_regression(target_signal, self._component_data)
+            fit_coefficients = linear_regression(target_signal, self._component_data)
+            if isinstance(fit_coefficients, da.Array):
+                with progressbar_dask('Computing fit'):
+                    fit_coefficients = fit_coefficients.compute()
+            self.coefficient_array[:] = fit_coefficients
         elif algorithm=='cupy_matrix_inversion':
             use_cupy = True
             self.coefficient_array[:] = linear_regression(target_signal, self._component_data, use_cupy = use_cupy)
@@ -1135,13 +1170,23 @@ class BaseModel(list):
             ridge_regression_alpha = kwargs.pop('alpha', '0.0')
 
             ridge_regression = import_sklearn.sklearn.linear_model._ridge.ridge_regression
-            self.coefficient_array[:] = ridge_regression(self._component_data.T, target_signal.T, alpha = ridge_regression_alpha, solver = ridge_regression_solver)
+            self.target = target_signal.T
+            fit_coefficients = ridge_regression(self._component_data.T, target_signal.T, alpha = ridge_regression_alpha, solver = ridge_regression_solver)
+            if isinstance(fit_coefficients, da.Array):
+                with progressbar_dask('Computing fit'):
+                    fit_coefficients = fit_coefficients.compute()
+            self.coefficient_array[:] = fit_coefficients
         else:
             raise ValueError("linear_algorithm {} not supported. Use 'ridge_regression' or 'matrix_inversion'.".format(algorithm))
-        
         self.coefficient_array = self.coefficient_array.reshape(nav_shape + (component_data_shape[0], ))
         covariance = self.calculate_covariance_matrix(target_signal.reshape(nav_shape + (sig1Dshape,)), concurrent_fit=concurrent_fit, use_cupy=use_cupy)
         standard_error = standard_error_from_covariance(covariance)
+        if isinstance(standard_error, da.Array):
+            from dask.diagnostics import ProgressBar
+            with ProgressBar():
+                standard_error = standard_error.compute()
+        self.standard_error = standard_error
+
         if concurrent_fit:
             j = 0 # counter to skip any zero-components
             for i, para in enumerate(self.free_parameters):
@@ -1149,10 +1194,8 @@ class BaseModel(list):
                     j += 1
                     pass
                 else:
-                    para.map['values'] = para.map['values'] * \
-                        self.coefficient_array[..., i-j]
-                    para.map['std'] = np.abs(
-                        para.map['values']*standard_error[..., i-j])
+                    para.map['values'] = para.map['values'] * self.coefficient_array[..., i-j]
+                    #para.map['std'] = np.abs(para.map['values']*standard_error[..., i-j])
                     para.map['is_set'] = True
         else:
             oldp0 = self.p0

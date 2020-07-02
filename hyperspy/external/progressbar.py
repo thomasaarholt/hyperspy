@@ -27,7 +27,7 @@ else:
     from tqdm import tqdm, tqdm_notebook
 
 from hyperspy.defaults_parser import preferences
-
+from dask.callbacks import Callback
 
 def progressbar(*args, **kwargs):
     """Uses tqdm progressbar. This function exists for wrapping purposes only.
@@ -44,3 +44,15 @@ def progressbar(*args, **kwargs):
             pass
     return tqdm(*args, **kwargs)
 progressbar.__doc__ %= (tqdm.__doc__, tqdm.__init__.__doc__)
+
+class progressbar_dask(Callback):
+    def __init__(self, desc=""):
+        self.desc = desc
+    def _start_state(self, dsk, state):
+        self._tqdm = tqdm(desc=self.desc, total=sum(len(state[k]) for k in ['ready', 'waiting', 'running', 'finished']))
+
+    def _posttask(self, key, result, dsk, state, worker_id):
+        self._tqdm.update(1)
+
+    def _finish(self, dsk, state, errored):
+        pass
