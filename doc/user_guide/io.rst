@@ -790,7 +790,6 @@ Or several by using a list:
     ...                 "/experimental/science_data_1"])
 
 
-asdf
 
 .. _emd_fei-format:
 
