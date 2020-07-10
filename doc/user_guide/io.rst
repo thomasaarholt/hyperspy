@@ -227,7 +227,7 @@ applications
 Part of the specification is documented in :ref:`metadata_structure`.
 
 .. versionadded:: 1.2
-    Enable saving HSpy files with the ``.hspy`` extension. Preveously only the
+    Enable saving HSpy files with the ``.hspy`` extension. Previously only the
     ``.hdf5`` extension was recognised.
 
 .. versionchanged:: 1.3
@@ -289,7 +289,7 @@ intensity<get_lines_intensity>`):
 .. versionadded:: 1.3.1
     ``chunks`` keyword argument
 
-Chunk shape should follow the axes order as the numpy shape (`s.data.shape`), not the hyperspy signal shape.
+Chunk shape should follow the axes order of the numpy shape (``s.data.shape``), not the hyperspy shape.
 By default, the data is saved in chunks that are optimised to contain at least one full signal. It is
 possible to customise the chunk shape using the ``chunks`` keyword. For example, to save the data with
 ``(20, 20, 256)`` chunks instead of the default ``(7, 7, 2048)`` chunks for this signal:
@@ -315,7 +315,7 @@ Extra saving arguments
 .. note::
 
     Compression can significantly increase the saving speed. If storage space 
-    is not an issue, it can be disabled by setting `compression = None`.
+    is not an issue, it can be disabled by setting ``compression = None``.
 
 .. _netcdf-format:
 
