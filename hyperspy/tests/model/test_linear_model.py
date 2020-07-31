@@ -48,7 +48,7 @@ class TestModelFitBinned:
     def test_fit_linear(self):
         self.m[0].sigma.free = False
         self.m[0].centre.free = False
-        self.m.fit(fitter="linear")
+        self.m.fit(optimizer='linear')
         np.testing.assert_allclose(self.m[0].A.value, 6132.640632924692, 1)
         np.testing.assert_allclose(self.m[0].centre.value, 0.5)
         np.testing.assert_allclose(self.m[0].sigma.value, 1)
@@ -70,10 +70,10 @@ class TestMultiFitLinear:
         L.centre.free = L.sigma.free = False
         m.append(L)
 
-        m.fit(fitter='linear')
+        m.fit(optimizer='linear')
         single = m.as_signal()
         m.assign_current_values_to_all()
-        m.multifit(fitter='linear', iterpath='flyback')
+        m.multifit(optimizer='linear', iterpath='flyback')
         multi = m.as_signal()
 
         np.testing.assert_almost_equal(
@@ -84,10 +84,10 @@ class TestMultiFitLinear:
         L = Offset(offset=1.)
         m.append(L)
 
-        m.fit(fitter='linear')
+        m.fit(optimizer='linear')
         single = m.as_signal()
         m.assign_current_values_to_all()
-        m.multifit(fitter='linear', iterpath='flyback')
+        m.multifit(optimizer='linear', iterpath='flyback')
         multi = m.as_signal()
         # compare fits from first pixel
         np.testing.assert_almost_equal(
@@ -102,18 +102,18 @@ class TestLinearFitting:
 
     def test_linear_fitting_with_offset(self):
         m = self.m
-        m.fit(fitter='linear')
+        m.fit(optimizer='linear')
         linear = m.as_signal()
         np.testing.assert_allclose(m.p0, np.array([933.2343071493418, 47822.98004150301, -5867.611808815612, 56805.518919752234]))
 
         # Repeat test with offset fixed
         self.c.b.free = False
-        m.fit(fitter='linear')
+        m.fit(optimizer='linear')
         linear = m.as_signal()
         np.testing.assert_allclose(m.p0, np.array([933.2343071496773, 47822.98004150315, -5867.611808815624]))
 
     def test_fixed_offset_value(self):
-        self.m.fit(fitter='linear')
+        self.m.fit(optimizer='linear')
         c = self.c
         c.b.free = False
         constant = c._compute_constant_term()
@@ -133,12 +133,12 @@ class TestFitAlgorithms:
 
     def test_compare_algorithms(self):
         m = self.m
-        m.fit(linear_algorithm='ridge_regression')
+        m.fit(optimizer='linear', linear_algorithm='ridge_regression')
         assert m._linear_algorithm == 'ridge_regression'
 
         ridge_fit = m.as_signal()
 
-        m.fit(linear_algorithm='matrix_inversion')
+        m.fit(optimizer='linear', linear_algorithm='matrix_inversion')
         assert m._linear_algorithm == 'matrix_inversion'
         matrix_fit = m.as_signal()
         np.testing.assert_array_almost_equal(ridge_fit.data, matrix_fit.data)
@@ -155,10 +155,10 @@ class TestLinearEELSFitting:
 
     def test_convolved_and_std_error(self):
         m = self.m_convolved
-        m.fit(fitter='linear')
+        m.fit(optimizer='linear')
         linear = m.as_signal()
         std_linear = m.p_std
-        m.fit(fitter='leastsq')
+        m.fit(optimizer='leastsq')
         leastsq = m.as_signal()
         std_leastsq = m.p_std
         diff = linear - leastsq
@@ -167,9 +167,9 @@ class TestLinearEELSFitting:
 
     def test_nonconvolved(self):
         m = self.m
-        m.fit(fitter='linear')
+        m.fit(optimizer='linear')
         linear = m.as_signal()
-        m.fit(fitter='leastsq')
+        m.fit(optimizer='leastsq')
         leastsq = m.as_signal()
         diff = linear - leastsq
         np.testing.assert_almost_equal(diff.data.sum(), 0.0, decimal=2)
@@ -198,7 +198,7 @@ class TestLinearModel2D:
         G1.set_parameters_not_free()
         G1.A.free = True
 
-        m.fit(fitter='linear')
+        m.fit(optimizer='linear')
         diff = (s - m.as_signal(show_progressbar=False))
         np.testing.assert_almost_equal(diff.data.sum(), 0.0)
         np.testing.assert_almost_equal(m.p_std[0], 0.0)
@@ -231,7 +231,7 @@ class TestLinearModel2D:
                 g.A.free = True
                 m.append(g)
 
-        m.fit(fitter='linear')
+        m.fit(optimizer='linear')
         np.testing.assert_array_almost_equal(s.data, m.as_signal().data)
 
     def test_model2D_polyexpression(self):
@@ -248,7 +248,7 @@ class TestLinearModel2D:
 
         m = s.create_model()
         m.append(P)
-        m.fit(fitter='linear')
+        m.fit(optimizer='linear')
         diff = (s - m.as_signal(show_progressbar=False))
         np.testing.assert_almost_equal(diff.data.sum(), 0.0, decimal=2)
         np.testing.assert_almost_equal(m.p_std, 0.0, decimal=2)
@@ -285,7 +285,7 @@ class TestLinearFitTwins:
             g.A.twin = None
 
         self.gs[0].A.value = 1
-        self.m.fit(fitter='linear')
+        self.m.fit(optimizer='linear')
 
         np.testing.assert_almost_equal(self.gs[0].A.value, 20)
         np.testing.assert_almost_equal(self.gs[1].A.value, -10)
@@ -299,7 +299,7 @@ class TestLinearFitTwins:
             g.centre.free = False
 
         self.gs[0].A.value = 1
-        self.m.fit(fitter='linear')
+        self.m.fit(optimizer='linear')
         
         np.testing.assert_almost_equal(self.gs[0].A.value, 20)
         np.testing.assert_almost_equal(self.gs[1].A.value, -10)
