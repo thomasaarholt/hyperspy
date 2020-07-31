@@ -1726,8 +1726,13 @@ class BaseModel(list):
                 self.p0 = self.fit_output.x
                 self.p_std = self.fit_output.perror
 
-            elif fitter == "linear":
+            elif optimizer == "linear":
+                linear_algorithm = kwargs.pop('linear_algorithm', 'ridge_regression')
+                self._linear_algorithm = linear_algorithm # used for tests
                 self._linear_fitting(algorithm=linear_algorithm, kwargs=kwargs)
+                self.fit_output = OptimizeResult(
+                    success=True,
+                )
             else:
                 # scipy.optimize.* functions
                 if loss_function == "ls":
