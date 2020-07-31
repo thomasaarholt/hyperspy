@@ -1079,18 +1079,6 @@ class BaseModel(list):
         else:
             # No free parameters, so component is fixed.
             self._component_data_fixed[:] += component._compute_component()
-    
-    def _remove_any_zero_components(self):
-        '''Remove any zero-components from the component_data
-        
-        If any component.function comes out as zero in the signal_range being fitted,
-        it should not be attempted fitted to the region. This method removes it from the array,
-        and skips the coefficient multiplication later on for that parameter.
-        '''
-        self._zero_comp_indices = np.where(np.invert(self._component_data.any(axis=1)))[0]
-        self._component_data = np.delete(self._component_data, self._zero_comp_indices, axis=0)
-        self.coefficient_array = np.delete(self.coefficient_array, self._zero_comp_indices, axis=0)
-
 
     def calculate_covariance_matrix(self, target_signal):
         '''Calculate covariance matrix after having performed Linear Regression
@@ -1147,7 +1135,6 @@ class BaseModel(list):
         n_free_para = len(self.free_parameters)
         assert n_free_para > 0, 'Model does not contain any free components!'
         channels_signal_shape = np.count_nonzero(self.channel_switches)
-        arr_nav_shape = self.axes_manager._navigation_shape_in_array
         
         # nav_shape and comp_nav_shape may change with future linear fitting speedups
         nav_shape = ()
@@ -1166,9 +1153,6 @@ class BaseModel(list):
             if component.active:
                 self._append_component(component)
 
-        # The linear components
-        self._remove_any_zero_components()
-
         target_signal = self.signal()[np.where(self.channel_switches)]
 
         if self.signal.metadata.Signal.binned is True:
@@ -1176,7 +1160,6 @@ class BaseModel(list):
 
         target_signal = target_signal - self._component_data_fixed  # - model_constant_term
 
-        component_data_shape = self._component_data.shape
         sig1Dshape = np.count_nonzero(self.channel_switches)
 
         # Reshape what may potentially be Signal2D data into a long Signal1D shape
@@ -1192,33 +1175,24 @@ class BaseModel(list):
         elif algorithm == 'ridge_regression':
             ridge_regression_solver = kwargs.pop('solver', 'auto')
             ridge_regression_alpha = kwargs.pop('alpha', 0.0)
-            self._ridge_regression_solver = ridge_regression_solver
-            self._ridge_regression_alpha = ridge_regression_alpha
 
             ridge_regression = import_sklearn.sklearn.linear_model._ridge.ridge_regression
-            self.coefficient_array[:] = ridge_regression(self._component_data.T, target_signal, alpha = ridge_regression_alpha, solver = ridge_regression_solver)
+            self.coefficient_array[:] = ridge_regression(
+                X = self._component_data.T,
+                y = target_signal,
+                alpha = ridge_regression_alpha,
+                solver = ridge_regression_solver)
         else:
             raise ValueError("linear_algorithm {} not supported. Use 'ridge_regression' or 'matrix_inversion'.".format(algorithm))
         covariance = self.calculate_covariance_matrix(target_signal)
-        standard_error = standard_error_from_covariance(covariance)
-        oldp0 = self.p0
-        self.p0 = ()
-        self.p_std = ()
-        j = 0
-        for i, p in enumerate(oldp0):
-            if i in self._zero_comp_indices:
-                # components that were removed from linear fitting bc they were zero
-                self.p0 += (0,)
-                self.p_std += (np.nan,)
-                j += 1
-            else:
-                p0 = p * self.coefficient_array[i-j]
-                self.p0 += (p0,)
-                self.p_std += (abs(p0*standard_error[i-j]),) 
-        self.store_current_values()
-        # reshape back from potentially Signal2D data
-        self._component_data = self._component_data.reshape(component_data_shape)
-        self.fetch_stored_values()
+        fit_output = {
+            'success':True
+        }
+        fit_output['x'] = self.p0 * self.coefficient_array
+        fit_output['covar'] = covariance
+        fit_output['perror'] = np.abs(fit_output['x']) * standard_error_from_covariance(fit_output['covar'])
+        fit_output['algorithm'] = algorithm
+        return fit_output
 
     def _errfunc_sq(self, param, y, weights=None):
         if weights is None:
@@ -1729,10 +1703,11 @@ class BaseModel(list):
             elif optimizer == "linear":
                 linear_algorithm = kwargs.pop('linear_algorithm', 'ridge_regression')
                 self._linear_algorithm = linear_algorithm # used for tests
-                self._linear_fitting(algorithm=linear_algorithm, kwargs=kwargs)
-                self.fit_output = OptimizeResult(
-                    success=True,
-                )
+                fit_output = self._linear_fitting(algorithm=linear_algorithm, kwargs=kwargs)
+                self.fit_output = OptimizeResult(**fit_output)
+                self.p0 = self.fit_output.x
+                self.p_std = self.fit_output.perror
+                
             else:
                 # scipy.optimize.* functions
                 if loss_function == "ls":

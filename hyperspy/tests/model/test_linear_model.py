@@ -158,20 +158,20 @@ class TestLinearEELSFitting:
         m.fit(optimizer='linear')
         linear = m.as_signal()
         std_linear = m.p_std
-        m.fit(optimizer='leastsq')
-        leastsq = m.as_signal()
-        std_leastsq = m.p_std
-        diff = linear - leastsq
+        m.fit(optimizer='lm')
+        lm = m.as_signal()
+        std_lm = m.p_std
+        diff = linear - lm
         np.testing.assert_almost_equal(diff.data.sum(), 0.0, decimal=2)
-        np.testing.assert_almost_equal(std_linear, std_leastsq, decimal=5)
+        np.testing.assert_almost_equal(std_linear, std_lm, decimal=5)
 
     def test_nonconvolved(self):
         m = self.m
         m.fit(optimizer='linear')
         linear = m.as_signal()
-        m.fit(optimizer='leastsq')
-        leastsq = m.as_signal()
-        diff = linear - leastsq
+        m.fit(optimizer='lm')
+        lm = m.as_signal()
+        diff = linear - lm
         np.testing.assert_almost_equal(diff.data.sum(), 0.0, decimal=2)
 
 class TestLinearModel2D:
