@@ -188,15 +188,13 @@ class current_model_values():
 
 def linear_regression(y, component_data):
     '''
-    Performs linear regression on single pixels as well
-    as multidimensional arrays
+    Performs linear regression by matrix inversion, solving the problem Ax = b
 
     Parameters
     ----------
-    y : array_like, shape: (signal_axis) or (nav_shape, signal_axis)
+    y               : array_like, shape: (signal_axis) or (nav_shape, signal_axis)
         The data to be fit to
-    component_data : array_like, shape: (number_of_comp, signal_axis) or (nav_shape,
-                                    number_of_comp, signal_axis)
+    component_data  : array_like, shape: (number_of_comp, signal_axis) or (nav_shape, number_of_comp, signal_axis)
         The components to fit to the data
 
     Returns:
