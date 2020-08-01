@@ -1003,22 +1003,25 @@ class BaseModel(list):
             parameter.value = 1
 
     def p0_index_from_component(self, component):
-        'Get p0 index for components that have only one free parameter'
+        "Get p0 index for components that have only one free parameter"
         return self.free_parameters.index(component.free_parameters[0])
 
     def p0_index_from_parameter(self, parameter):
-        'For components that have multiple free parameters'
+        "For components that have multiple free parameters"
         return self.free_parameters.index(parameter)
 
     def _assign_twin_value_maps(self):
-        'Set the correct value for the twinned parameters'
+        "Set the correct value for the twinned parameters"
         for para in self.twinned_parameters:
             # Superfluous as it should be set already, but it's cheap
-            para.value = para.twin_function(
-                para.twin.value) if para.twin_function else para.twin.value
+            para.value = (
+                para.twin_function(para.twin.value)
+                if para.twin_function
+                else para.twin.value
+            )
 
     def _set_twinned_lists(self):
-        'Create lists of twinned components and their parents'
+        "Create lists of twinned components and their parents"
         self.twinned_components_parents = []
         self.twinned_components = []
         self.twinned_parameters = []
@@ -1032,11 +1035,11 @@ class BaseModel(list):
                     self.twinned_components_parents.append(parent.component)
 
     def _append_component(self, component):
-        '''
+        """
         Compute the component with current parameter values, and add that to the component_data array
 
         The following code works for a component where ax+b/x+c can be
-        multiple "pseudo" components, not only one'''
+        multiple "pseudo" components, not only one"""
         if component in self.twinned_components:
             # These twinned components have a linear parameter that is twinned
             i = self.twinned_components.index(component)
@@ -1045,9 +1048,13 @@ class BaseModel(list):
             parent_twin = self.twinned_components_parents[i]
             if parent_twin.free_parameters:
                 # component depends on some free component
-                top_parent_index = self.p0_index_from_component(self.twinned_components_parents[i])
+                top_parent_index = self.p0_index_from_component(
+                    self.twinned_components_parents[i]
+                )
                 component_data = component._compute_component()
-                self._component_data[top_parent_index, :] += component_data - component_constant_data
+                self._component_data[top_parent_index, :] += (
+                    component_data - component_constant_data
+                )
             else:
                 # component will be calculated under "_compute_constant_term"
                 component_data = 0
@@ -1062,27 +1069,33 @@ class BaseModel(list):
             if len(component.free_parameters) == 1:
                 component_data = component._compute_component()
                 component_constant_data = component._compute_constant_term()
-                self._component_data[index, :] += component_data - component_constant_data
+                self._component_data[index, :] += (
+                    component_data - component_constant_data
+                )
                 self._component_data_fixed[:] += component_constant_data
             else:
                 # Check that this component is based on Expression
-                assert component._str_expression, \
-                    "Component {} has more than one free parameter, " \
-                    "which is only supported for Expression type " \
+                assert component._str_expression, (
+                    "Component {} has more than one free parameter, "
+                    "which is only supported for Expression type "
                     "components."
+                )
                 free, fixed = component._separate_pseudocomponents()
                 for free_parameter in component.free_parameters:
                     index = self.p0_index_from_parameter(free_parameter)
-                    self._component_data[..., index, :] += component._compute_expression_part(
-                        free[free_parameter.name])
-                self._component_data_fixed[:] += component._compute_expression_part(fixed)
+                    self._component_data[
+                        ..., index, :
+                    ] += component._compute_expression_part(free[free_parameter.name])
+                self._component_data_fixed[:] += component._compute_expression_part(
+                    fixed
+                )
         else:
             # No free parameters, so component is fixed.
             self._component_data_fixed[:] += component._compute_component()
 
     def calculate_covariance_matrix(self, target_signal):
-        '''Calculate covariance matrix after having performed Linear Regression
-        '''
+        """Calculate covariance matrix after having performed Linear Regression
+        """
         n = np.count_nonzero(self.channel_switches)  # the signal axis length
         k = self._component_data.shape[-2]  # the number of components
 
@@ -1095,7 +1108,7 @@ class BaseModel(list):
         covariance = (1 / (n - k)) * np.dot(res_dot, inv_fit_dot)
         return covariance
 
-    def _linear_fitting(self, algorithm='ridge_regression', **kwargs):
+    def _linear_fitting(self, algorithm="ridge_regression", **kwargs):
         """
         Multivariate linear fitting
 
@@ -1104,26 +1117,28 @@ class BaseModel(list):
             'ridge_regression' - Default using sklearn
             'matrix_inversion' - Fallback, fragile
         """
-        not_linear_error = "Not all free parameters are linear. " \
-            "Fit with a " \
-            "different fitter or set non-linear " \
-            "`parameters.free = False`. These " \
+        not_linear_error = (
+            "Not all free parameters are linear. "
+            "Fit with a "
+            "different fitter or set non-linear "
+            "`parameters.free = False`. These "
             "parameters are nonlinear:"
+        )
         nonlinear_parameters = self.nonlinear_parameters
         if nonlinear_parameters:
-            raise AttributeError(not_linear_error + "\n\t" + str(
-        "\n\t".join(str(para) for para in nonlinear_parameters))
-        )
+            raise AttributeError(
+                not_linear_error
+                + "\n\t"
+                + str("\n\t".join(str(para) for para in nonlinear_parameters))
+            )
         if not self.linear_parameters:
             raise AttributeError("There are no linear components in this model")
-
 
         self._set_linear_parameters_to_one()
         self._set_p0()
         n_free_para = len(self.free_parameters)
-        assert n_free_para > 0, 'Model does not contain any free components!'
+        assert n_free_para > 0, "Model does not contain any free components!"
         channels_signal_shape = np.count_nonzero(self.channel_switches)
-        
 
         self._component_data = np.zeros((n_free_para, channels_signal_shape))
         self._component_data_fixed = np.zeros(channels_signal_shape)
@@ -1138,7 +1153,9 @@ class BaseModel(list):
         target_signal = self.signal()[np.where(self.channel_switches)]
 
         if self.signal.metadata.Signal.binned is True:
-            target_signal = target_signal / np.prod(tuple((ax.scale for ax in self.signal.axes_manager.signal_axes)))
+            target_signal = target_signal / np.prod(
+                tuple((ax.scale for ax in self.signal.axes_manager.signal_axes))
+            )
 
         target_signal = target_signal - self._component_data_fixed
 
@@ -1146,34 +1163,43 @@ class BaseModel(list):
 
         # Reshape what may potentially be Signal2D data into a long Signal1D shape
         target_signal = target_signal.reshape(sig1Dshape)
-        if not import_sklearn.sklearn_installed or algorithm=='matrix_inversion':
-            if algorithm != 'matrix_inversion':
+        if not import_sklearn.sklearn_installed or algorithm == "matrix_inversion":
+            if algorithm != "matrix_inversion":
                 warnings.warn(
-                "Linear fitting is preferably done using the scikit-learn ridge regression code. "
-                "Install scikit-learn (sklearn) to use it. Proceding using a more fragile "
-                "matrix inversion approach."
+                    "Linear fitting is preferably done using the scikit-learn ridge regression code. "
+                    "Install scikit-learn (sklearn) to use it. Proceding using a more fragile "
+                    "matrix inversion approach."
                 )
-            self.coefficient_array[:] = linear_regression(target_signal, self._component_data)
-        elif algorithm == 'ridge_regression':
-            ridge_regression_solver = kwargs.pop('solver', 'auto')
-            ridge_regression_alpha = kwargs.pop('alpha', 0.0)
+            self.coefficient_array[:] = linear_regression(
+                target_signal, self._component_data
+            )
+        elif algorithm == "ridge_regression":
+            ridge_regression_solver = kwargs.pop("solver", "auto")
+            ridge_regression_alpha = kwargs.pop("alpha", 0.0)
 
-            ridge_regression = import_sklearn.sklearn.linear_model._ridge.ridge_regression
+            ridge_regression = (
+                import_sklearn.sklearn.linear_model._ridge.ridge_regression
+            )
             self.coefficient_array[:] = ridge_regression(
-                X = self._component_data.T,
-                y = target_signal,
-                alpha = ridge_regression_alpha,
-                solver = ridge_regression_solver)
+                X=self._component_data.T,
+                y=target_signal,
+                alpha=ridge_regression_alpha,
+                solver=ridge_regression_solver,
+            )
         else:
-            raise ValueError("linear_algorithm {} not supported. Use 'ridge_regression' or 'matrix_inversion'.".format(algorithm))
+            raise ValueError(
+                "linear_algorithm {} not supported. Use 'ridge_regression' or 'matrix_inversion'.".format(
+                    algorithm
+                )
+            )
         covariance = self.calculate_covariance_matrix(target_signal)
-        fit_output = {
-            'success':True
-        }
-        fit_output['x'] = self.p0 * self.coefficient_array
-        fit_output['covar'] = covariance
-        fit_output['perror'] = np.abs(fit_output['x']) * standard_error_from_covariance(fit_output['covar'])
-        fit_output['algorithm'] = algorithm
+        fit_output = {"success": True}
+        fit_output["x"] = self.p0 * self.coefficient_array
+        fit_output["covar"] = covariance
+        fit_output["perror"] = np.abs(fit_output["x"]) * standard_error_from_covariance(
+            fit_output["covar"]
+        )
+        fit_output["algorithm"] = algorithm
         return fit_output
 
     def _errfunc_sq(self, param, y, weights=None):

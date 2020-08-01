@@ -187,7 +187,7 @@ class current_model_values():
         return html
 
 def linear_regression(y, component_data):
-    '''
+    """
     Performs linear regression by matrix inversion, solving the problem Ax = b
 
     Parameters
@@ -202,7 +202,7 @@ def linear_regression(y, component_data):
     fit_coefficients : array_like, 
                         shape: (number_of_comp) or (nav_shape, number_of_comp)
 
-    '''
+    """
     # Setting the following will be convenient for future dask/lazy support
     matmul = np.matmul
     inv = np.linalg.inv
@@ -216,7 +216,7 @@ def linear_regression(y, component_data):
 
 
 def standard_error_from_covariance(covariance):
-    'Get standard error coefficients from the diagonal of the covariance'
+    "Get standard error coefficients from the diagonal of the covariance"
     # dask diag only supports 2D arrays, so we cannot use diag (for now)
     # if isinstance(data, da.Array):
     #     sqrt = da.sqrt
@@ -229,7 +229,7 @@ def standard_error_from_covariance(covariance):
 
 
 def get_top_parent_twin(parameter):
-    'Get the top parent twin, if there is one'
+    "Get the top parent twin, if there is one"
     if parameter.twin:
         return get_top_parent_twin(parameter.twin)
     else:
