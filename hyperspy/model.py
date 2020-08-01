@@ -1085,26 +1085,14 @@ class BaseModel(list):
         '''
         n = np.count_nonzero(self.channel_switches)  # the signal axis length
         k = self._component_data.shape[-2]  # the number of components
-        nav_shape = () # Keep nav_shape as it will be useful to modify for later updates to linear fititng
 
-        fit = np.zeros(nav_shape + (n, k))
-        # Either component_data is the same across all nav, or not.
-        # Keep nav_shape for later updates to linear fitting
-        # For single pixels
-        for index in np.ndindex(nav_shape):
-            fit[index] = (self._component_data[index].T *
-                            self.coefficient_array[index])
+        fit = self._component_data.T * self.coefficient_array
         res = target_signal - fit.sum(-1)  # The residual
-        res_dot = np.zeros(nav_shape)
-        for index in np.ndindex(nav_shape):
-            res_dot[index] = np.dot(res[index].T, res[index])
+        res_dot = np.dot(res.T, res)
 
         fit_dot = np.matmul(fit.swapaxes(-2, -1), fit)
         inv_fit_dot = np.linalg.inv(fit_dot)
-        covariance = np.zeros(nav_shape + (k, k))
-        for index in np.ndindex(nav_shape):
-            covariance[index] = (1 / (n - k)) * \
-                np.dot(res_dot[index], inv_fit_dot[index])
+        covariance = (1 / (n - k)) * np.dot(res_dot, inv_fit_dot)
         return covariance
 
     def _linear_fitting(self, algorithm='ridge_regression', **kwargs):
@@ -1136,17 +1124,11 @@ class BaseModel(list):
         assert n_free_para > 0, 'Model does not contain any free components!'
         channels_signal_shape = np.count_nonzero(self.channel_switches)
         
-        # nav_shape and comp_nav_shape may change with future linear fitting speedups
-        nav_shape = ()
-        comp_nav_shape = ()
 
-        self._component_data = np.zeros(
-            comp_nav_shape + (n_free_para, channels_signal_shape)
-        )
-        self._component_data_fixed = np.zeros(
-            comp_nav_shape + (channels_signal_shape, ))
+        self._component_data = np.zeros((n_free_para, channels_signal_shape))
+        self._component_data_fixed = np.zeros(channels_signal_shape)
 
-        self.coefficient_array = np.zeros(nav_shape + (n_free_para,))
+        self.coefficient_array = np.zeros(n_free_para)
         self._set_twinned_lists()
         self._assign_twin_value_maps()
         for component in self:
@@ -1158,12 +1140,12 @@ class BaseModel(list):
         if self.signal.metadata.Signal.binned is True:
             target_signal = target_signal / np.prod(tuple((ax.scale for ax in self.signal.axes_manager.signal_axes)))
 
-        target_signal = target_signal - self._component_data_fixed  # - model_constant_term
+        target_signal = target_signal - self._component_data_fixed
 
         sig1Dshape = np.count_nonzero(self.channel_switches)
 
         # Reshape what may potentially be Signal2D data into a long Signal1D shape
-        target_signal = target_signal.reshape(nav_shape + (sig1Dshape,))
+        target_signal = target_signal.reshape(sig1Dshape)
         if not import_sklearn.sklearn_installed or algorithm=='matrix_inversion':
             if algorithm != 'matrix_inversion':
                 warnings.warn(
