@@ -1040,38 +1040,52 @@ class BaseModel(list):
             'ridge_regression' - Default using sklearn
             'matrix_inversion' - Fallback, fragile
         """
-        not_linear_error = (
-            "Not all free parameters are linear. "
-            "Fit with a "
-            "different fitter or set non-linear "
-            "`parameters.free = False`. These "
-            "parameters are nonlinear:"
-        )
-        nonlinear_parameters = self.nonlinear_parameters
-        if nonlinear_parameters:
-            raise AttributeError(
-                not_linear_error
-                + "\n\t"
-                + str("\n\t".join(str(para) for para in nonlinear_parameters))
+        try:
+            self._precomputed_components
+        except AttributeError:
+            self._precomputed_components = False
+
+        if not self._precomputed_components:
+            not_linear_error = (
+                "Not all free parameters are linear. "
+                "Fit with a "
+                "different fitter or set non-linear "
+                "`parameters.free = False`. These "
+                "parameters are nonlinear:"
             )
-        if not self.linear_parameters:
-            raise AttributeError("There are no linear components in this model")
+            nonlinear_parameters = self.nonlinear_parameters
+            if nonlinear_parameters:
+                raise AttributeError(
+                    not_linear_error
+                    + "\n\t"
+                    + str("\n\t".join(str(para) for para in nonlinear_parameters))
+                )
+            if not self.linear_parameters:
+                raise AttributeError("There are no linear components in this model")
 
-        self._set_linear_parameters_to_one()
-        self._set_p0()
-        n_free_para = len(self.free_parameters)
-        assert n_free_para > 0, "Model does not contain any free components!"
-        channels_signal_shape = np.count_nonzero(self.channel_switches)
+            self._set_linear_parameters_to_one()
+            self._set_p0()
+            n_free_para = len(self.free_parameters)
+            assert n_free_para > 0, "Model does not contain any free components!"
+            channels_signal_shape = np.count_nonzero(self.channel_switches)
 
-        self._component_data = np.zeros((n_free_para, channels_signal_shape))
-        self._component_data_fixed = np.zeros(channels_signal_shape)
+            self._component_data = np.zeros((n_free_para, channels_signal_shape))
+            self._component_data_fixed = np.zeros(channels_signal_shape)
 
-        self.coefficient_array = np.zeros(n_free_para)
-        self._set_twinned_lists()
-        self._assign_twin_value_maps()
-        for component in self:
-            if component.active:
-                self._append_component(component)
+            self.coefficient_array = np.zeros(n_free_para)
+            self._set_twinned_lists()
+            self._assign_twin_value_maps()
+            for component in self:
+                if component.active:
+                    self._append_component(component)
+        
+            try:
+                self._is_multifit
+            except AttributeError:
+                self._is_multifit = False
+            
+            if self._is_multifit:
+                self._precomputed_components = True
 
         target_signal = self.signal()[np.where(self.channel_switches)]
 
@@ -1085,7 +1099,8 @@ class BaseModel(list):
         sig1Dshape = np.count_nonzero(self.channel_switches)
 
         # Reshape what may potentially be Signal2D data into a long Signal1D shape
-        target_signal = target_signal.reshape(sig1Dshape)
+        target_signal = target_signal.reshape(sig1Dshape)        
+
         if not import_sklearn.sklearn_installed or algorithm == "matrix_inversion":
             if algorithm != "matrix_inversion":
                 warnings.warn(
@@ -1781,6 +1796,10 @@ class BaseModel(list):
         * :py:meth:`~hyperspy.model.BaseModel.fit`
 
         """
+        self._is_multifit = True
+        if ("optimizer", "linear") in kwargs.items():
+            self._precomputed_components = False # when True, reuse linear fitting components
+
         if show_progressbar is None:
             show_progressbar = preferences.General.show_progressbar
 
@@ -1820,42 +1839,53 @@ class BaseModel(list):
         maxval = self.axes_manager._get_iterpath_size(masked_elements)
         show_progressbar = show_progressbar and (maxval != 0)
 
-        i = 0
-        with self.axes_manager.events.indices_changed.suppress_callback(
-            self.fetch_stored_values
-        ):
-            if interactive_plot:
-                outer = dummy_context_manager
-                inner = self.suspend_update
-            else:
-                outer = self.suspend_update
-                inner = dummy_context_manager
+        try:
+            i = 0
+            with self.axes_manager.events.indices_changed.suppress_callback(
+                self.fetch_stored_values
+            ):
+                if interactive_plot:
+                    outer = dummy_context_manager
+                    inner = self.suspend_update
+                else:
+                    outer = self.suspend_update
+                    inner = dummy_context_manager
 
-            with outer(update_on_resume=True):
-                with progressbar(
-                    total=maxval, disable=not show_progressbar, leave=True
-                ) as pbar:
-                    for index in self.axes_manager:
-                        with inner(update_on_resume=True):
-                            if mask is None or not mask[index[::-1]]:
-                                # first check if model has set initial values in
-                                # parameters.map['values'][indices],
-                                # otherwise use values from previous fit
-                                self.fetch_stored_values(only_fixed=fetch_only_fixed)
-                                self.fit(**kwargs)
-                                i += 1
-                                pbar.update(1)
+                with outer(update_on_resume=True):
+                    with progressbar(
+                        total=maxval, disable=not show_progressbar, leave=True
+                    ) as pbar:
+                        for index in self.axes_manager:
+                            with inner(update_on_resume=True):
+                                if mask is None or not mask[index[::-1]]:
+                                    # first check if model has set initial values in
+                                    # parameters.map['values'][indices],
+                                    # otherwise use values from previous fit
+                                    self.fetch_stored_values(only_fixed=fetch_only_fixed)
+                                    self.fit(**kwargs)
+                                    i += 1
+                                    pbar.update(1)
 
-                            if autosave and i % autosave_every == 0:
-                                self.save_parameters2file(autosave_fn)
-            # Trigger the indices_changed event to update to current indices,
-            # since the callback was suppressed
-            self.axes_manager.events.indices_changed.trigger(self.axes_manager)
+                                if autosave and i % autosave_every == 0:
+                                    self.save_parameters2file(autosave_fn)
+                # Trigger the indices_changed event to update to current indices,
+                # since the callback was suppressed
+                self.axes_manager.events.indices_changed.trigger(self.axes_manager)
+        except KeyboardInterrupt:
+            self._is_multifit = False
+            raise KeyboardInterrupt
+        except Exception as e:
+            self._is_multifit = False
+            raise e
 
         if autosave is True:
             _logger.info(f"Deleting temporary file: {autosave_fn}.npz")
             os.remove(autosave_fn + ".npz")
-
+    
+        if ("optimizer", "linear") in kwargs.items():
+            self._precomputed_components = False
+        self._is_multifit = False
+    
     multifit.__doc__ %= (SHOW_PROGRESSBAR_ARG)
 
     def save_parameters2file(self, filename):
