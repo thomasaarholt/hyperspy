@@ -1017,16 +1017,21 @@ class UniformDataAxis(BaseDataAxis, UnitConversion):
 
 def serpentine_iter(shape):
     '''Similar to np.ndindex, but yields indices
-    in serpentine pattern, like snake game
+    in serpentine pattern, like snake game.
+    Takes shape in hyperspy order, not numpy order.
 
     Code by Stackoverflow user Paul Panzer,
     from https://stackoverflow.com/questions/57366966/
+
+    Note that the [::-1] reversing is necessary to iterate first along
+    the x-direction on multidimensional navigators.
     '''
+    shape = shape[::-1]
     N = len(shape)
     idx = N*[0]
     drc = N*[1]
     while True:
-        yield (*idx,)
+        yield (*idx,)[::-1]
         for j in reversed(range(N)):
             if idx[j] + drc[j] not in (-1, shape[j]):
                 idx[j] += drc[j]
@@ -1034,6 +1039,22 @@ def serpentine_iter(shape):
             drc[j] *= -1
         else:  # pragma: no cover
             break
+
+def flyback_iter(shape):
+    "Classic flyback scan pattern generator which yields indices in similar fashion to np.ndindex. Takes shape in hyperspy order, not numpy order."
+    shape = shape[::-1]
+    class ndindex_reversed(np.ndindex):
+        def __next__(self):
+            next(self._it)
+            return self._it.multi_index[::-1]
+
+    return ndindex_reversed(shape)
+
+iterpath_error = '''The iterpath scan pattern is set to "{}". \
+It must be either "serpentine" or "flyback", or an iterable of \
+hyperspy indices, and is set either \
+as multifit `iterpath` argument or \
+`axes_manager.iterpath`'''
 
 @add_gui_method(toolkey="hyperspy.AxesManager")
 class AxesManager(t.HasTraits):
@@ -1159,12 +1180,9 @@ class AxesManager(t.HasTraits):
             # Default to Signal1D view if the view is not fully defined
             self.set_signal_dimension(len(axes_list))
 
+        self._iterpath = 'flyback'
         self._update_attributes()
         self._update_trait_handlers()
-        self._index = None  # index for the iterpath
-        # Can use serpentine or flyback scan pattern
-        # for the axes manager indexing
-        self._iterpath = 'flyback'
 
     def _update_trait_handlers(self, remove=False):
         things = {self._on_index_changed: '_axes.index',
@@ -1357,57 +1375,51 @@ class AxesManager(t.HasTraits):
         if self._max_index != 0:
             self._max_index -= 1
 
+    @property
+    def iterpath(self):
+        "Sets or returns the current iteration path through the axes indices"
+        return self._iterpath
+
+    @iterpath.setter
+    def iterpath(self, path):
+        if isinstance(path, str):
+            if path == 'serpentine':
+                self._iterpath = 'serpentine'
+                self._iterpath_generator = serpentine_iter(self.navigation_shape)
+            elif path == 'flyback':
+                self._iterpath = 'flyback'
+                self._iterpath_generator = flyback_iter(self.navigation_shape)
+            else:
+                raise ValueError(iterpath_error.format(path))
+        else:
+            # Pass a custom indices iterator
+            self._iterpath = path
+            try:
+                self._iterpath_generator = iter(self._iterpath)
+            except TypeError:
+                raise TypeError(
+                f"The iterpath '{self._iterpath}' is not a correct iterpath. "
+                "Ensure it is an iterable delivering incides with length equal "
+                f"to the navigation dimension, which is {self.navigation_dimension}.")
+
     def __next__(self):
         """
-        Standard iterator method, updates the index and returns the
-        current coordinates
+        Standard iterator method, returns the current coordinates
 
         Returns
         -------
-        val : tuple of ints
+        self.indices : tuple of ints
             Returns a tuple containing the coordinates of the current
             iteration.
 
         """
-        if self._iterpath not in ['serpentine', 'flyback']:
-            raise ValueError('''The iterpath scan pattern is set to {}. \
-            It must be either "serpentine" or "flyback", and is set either \
-            as multifit `iterpath` argument or \
-            `axes_manager._iterpath`'''.format(self._iterpath))
-        if self._index is None:
-            self._index = 0
-            if self._iterpath == 'serpentine':
-                self._iterpath_generator = serpentine_iter(
-                    self._navigation_shape_in_array)
-                val = next(self._iterpath_generator)
-            else: # flyback
-                val = (0,) * self.navigation_dimension
-            self.indices = val
-        elif self._index >= self._max_index:
-            raise StopIteration
-        else:
-            self._index += 1
-            if self._iterpath == 'serpentine':
-                # In case we need to start further out in the generator
-                # for some reason. This is possibly expensive, as it needs
-                # to calculate all previous values first
-                # self._iterpath_generator = itertools.islice(
-                #     serpentine_iter(self._navigation_shape_in_array),
-                #     self._index,
-                #     None)
-                val = next(self._iterpath_generator)[::-1]
-            else:
-                val = np.unravel_index(
-                    self._index,
-                    tuple(self._navigation_shape_in_array)
-                )[::-1]
-            self.indices = val
-        return val
+        self.indices = next(self._iterpath_generator)
+        return self.indices
 
     def __iter__(self):
-        # Reset the _index that can have a value != None due to
-        # a previous iteration that did not hit a StopIteration
-        self._index = None
+        # re-initialize iterpath as it is set before correct data shape
+        # is created before data shape is known
+        self.iterpath = self._iterpath
         return self
 
     def _append_axis(self, **kwargs):

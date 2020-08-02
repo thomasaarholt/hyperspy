@@ -18,12 +18,13 @@
 
 from unittest import mock
 
-from numpy import arange, zeros
+from numpy import array, arange, zeros
 
-from hyperspy.axes import AxesManager
+from hyperspy.axes import AxesManager, serpentine_iter, flyback_iter
 from hyperspy.defaults_parser import preferences
 from hyperspy.signals import BaseSignal, Signal1D, Signal2D
 
+import pytest
 
 class TestAxesManager:
     def setup_method(self, method):
@@ -346,9 +347,42 @@ class TestIterPathScanPattern:
         s = Signal1D(zeros((3, 3, 3, 2)))
         self.am = s.axes_manager
 
+    def test_iterpath_property(self):
+        self.am._iterpath = "abc" # with underscore
+        assert self.am.iterpath == "abc"
+
+        with pytest.raises(ValueError):
+            self.am.iterpath = "blahblah" # w/o underscore
+        
+        path = "flyback"
+        self.am.iterpath = path
+        assert self.am.iterpath == path
+        assert self.am._iterpath == path
+
+        path = "serpentine"
+        self.am.iterpath = path
+        assert self.am.iterpath == path
+        assert self.am._iterpath == path
+            
+    def test_wrong_iterpath(self):
+        with pytest.raises(ValueError):
+            self.am.iterpath = ""
+
+    def test_wrong_custom_iterpath(self):
+        class A:
+            pass
+        with pytest.raises(TypeError):
+            self.am.iterpath = A()
+
+    def test_wrong_custom_iterpath(self):
+        self.am.iterpath = [(0,)] # not enough dimensions
+        with pytest.raises(AttributeError):
+            for i in self.am:
+                pass
+
     def test_flyback(self):
-        self.am._iterpath = "flyback"
-        for i, index in enumerate(self.am):
+        self.am.iterpath = "flyback"
+        for i, _ in enumerate(self.am):
             if i == 3:
                 assert self.am.indices == (0, 1, 0)
             # Hits a new layer on index 9
@@ -357,11 +391,62 @@ class TestIterPathScanPattern:
             break
 
     def test_serpentine(self):
-        self.am._iterpath = "serpentine"
-        for i, index in enumerate(self.am):
+        self.am.iterpath = "serpentine"
+        for i, _ in enumerate(self.am):
             if i == 3:
                 assert self.am.indices == (2, 1, 0)
             # Hits a new layer on index 9
             if i == 9:
                 assert self.am.indices == (2, 2, 1)
             break
+
+    def test_custom_iterpath(self):
+        iterpath = [(0,1,1), (1,1,1)]
+        self.am.iterpath = iterpath
+        assert self.am._iterpath == iterpath
+        assert self.am.iterpath == iterpath
+        for i, _ in enumerate(self.am):
+            if i == 0:
+                assert self.am.indices == iterpath[0]
+            if i == 1:
+                assert self.am.indices == iterpath[1]
+            break
+
+class TestIterPathScanPatternSignal2D:
+    def setup_method(self, method):
+        s = Signal2D(zeros((3, 3, 3, 2, 1)))
+        self.am = s.axes_manager
+
+    def test_wrong_iterpath_signal2D(self):
+        with pytest.raises(ValueError):
+            self.am.iterpath = "blahblah"
+
+    def test_custom_iterpath_signal2D(self):
+        indices = [(0,1,1), (1,1,1)]
+        self.am.iterpath = indices
+        for i, _ in enumerate(self.am):
+            if i == 0:
+                assert self.am.indices == indices[0]
+            if i == 1:
+                assert self.am.indices == indices[1]
+            break
+
+    def test_serpentine_signal2D(self):
+        self.am.iterpath = "serpentine"
+        for i, _ in enumerate(self.am):
+            if i == 3:
+                assert self.am.indices == (2, 1, 0)
+            # Hits a new layer on index 9
+            if i == 9:
+                assert self.am.indices == (2, 2, 1)
+            break
+
+def test_iterpath_function_flyback():
+    for i, indices in enumerate(flyback_iter((3,3,3))):
+        if i == 3:
+            assert indices == (0, 1, 0)
+
+def test_iterpath_function_flyback():
+    for i, indices in enumerate(serpentine_iter((3,3,3))):
+        if i == 3:
+            assert indices == (2, 1, 0)
