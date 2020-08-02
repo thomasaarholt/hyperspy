@@ -981,9 +981,8 @@ class BaseModel(list):
         for comp in self:
             if comp.active:
                 for parameter in comp.parameters:
-                    if parameter.free:
-                        if not parameter._is_linear:
-                            nonlinear.append(parameter)
+                    if parameter.free and not parameter._is_linear:
+                        nonlinear.append(parameter)
         return nonlinear
 
     @property
@@ -993,9 +992,8 @@ class BaseModel(list):
         for comp in self:
             if comp.active:
                 for parameter in comp.parameters:
-                    if parameter.free:
-                        if parameter._is_linear:
-                            linear.append(parameter)
+                    if parameter.free and parameter._is_linear:
+                        linear.append(parameter)
         return linear
 
     def _set_linear_parameters_to_one(self):
@@ -1007,18 +1005,8 @@ class BaseModel(list):
         return self.free_parameters.index(component.free_parameters[0])
 
     def p0_index_from_parameter(self, parameter):
-        "For components that have multiple free parameters"
+        "Get p0 index for components that have multiple free parameters"
         return self.free_parameters.index(parameter)
-
-    def _assign_twin_value_maps(self):
-        "Set the correct value for the twinned parameters"
-        for para in self.twinned_parameters:
-            # Superfluous as it should be set already, but it's cheap
-            para.value = (
-                para.twin_function(para.twin.value)
-                if para.twin_function
-                else para.twin.value
-            )
 
     def _set_twinned_lists(self):
         "Create lists of twinned components and their parents"
@@ -1052,13 +1040,13 @@ class BaseModel(list):
                     self.twinned_components_parents[i]
                 )
                 component_data = component._compute_component()
-                self._component_data[top_parent_index, :] += (
+                self._component_data[top_parent_index] += (
                     component_data - component_constant_data
                 )
             else:
                 # component will be calculated under "_compute_constant_term"
                 component_data = 0
-                self._component_data_fixed[:] += component_constant_data
+                self._component_data_fixed += component_constant_data
 
         elif component.free_parameters:
             # If component has free parameters, the component can't be twinned
@@ -1069,10 +1057,10 @@ class BaseModel(list):
             if len(component.free_parameters) == 1:
                 component_data = component._compute_component()
                 component_constant_data = component._compute_constant_term()
-                self._component_data[index, :] += (
+                self._component_data[index] += (
                     component_data - component_constant_data
                 )
-                self._component_data_fixed[:] += component_constant_data
+                self._component_data_fixed += component_constant_data
             else:
                 # Check that this component is based on Expression
                 assert component._str_expression, (
@@ -1086,12 +1074,12 @@ class BaseModel(list):
                     self._component_data[
                         ..., index, :
                     ] += component._compute_expression_part(free[free_parameter.name])
-                self._component_data_fixed[:] += component._compute_expression_part(
+                self._component_data_fixed += component._compute_expression_part(
                     fixed
                 )
         else:
             # No free parameters, so component is fixed.
-            self._component_data_fixed[:] += component._compute_component()
+            self._component_data_fixed += component._compute_component()
 
     def calculate_covariance_matrix(self, target_signal):
         """Calculate covariance matrix after having performed Linear Regression
@@ -1149,9 +1137,7 @@ class BaseModel(list):
             self._component_data = np.zeros((n_free_para, channels_signal_shape))
             self._component_data_fixed = np.zeros(channels_signal_shape)
 
-            self.coefficient_array = np.zeros(n_free_para)
             self._set_twinned_lists()
-            self._assign_twin_value_maps()
             for component in self:
                 if component.active:
                     self._append_component(component)
@@ -1185,7 +1171,7 @@ class BaseModel(list):
                     "Install scikit-learn (sklearn) to use it. Proceding using a more fragile "
                     "matrix inversion approach."
                 )
-            self.coefficient_array[:] = linear_regression(
+            self.coefficient_array = linear_regression(
                 target_signal, self._component_data
             )
         elif algorithm == "ridge_regression":
@@ -1195,7 +1181,7 @@ class BaseModel(list):
             ridge_regression = (
                 import_sklearn.sklearn.linear_model._ridge.ridge_regression
             )
-            self.coefficient_array[:] = ridge_regression(
+            self.coefficient_array = ridge_regression(
                 X=self._component_data.T,
                 y=target_signal,
                 alpha=ridge_regression_alpha,
