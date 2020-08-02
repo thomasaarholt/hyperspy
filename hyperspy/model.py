@@ -1111,7 +1111,7 @@ class BaseModel(list):
             not_linear_error = (
                 "Not all free parameters are linear. "
                 "Fit with a "
-                "different fitter or set non-linear "
+                "different optimizer or set non-linear "
                 "`parameters.free = False`. These "
                 "parameters are nonlinear:"
             )
