@@ -270,6 +270,8 @@ class BaseModel(list):
             obj : Model
                 The Model that the event belongs to
             """, arguments=['obj'])
+        self._is_multifit = False
+        self._precomputed_components = False
 
     def __hash__(self):
         # This is needed to simulate a hashable object so that PySide does not
@@ -1105,11 +1107,6 @@ class BaseModel(list):
             'ridge_regression' - Default using sklearn
             'matrix_inversion' - Fallback, fragile
         """
-        try:
-            self._precomputed_components
-        except AttributeError:
-            self._precomputed_components = False
-
         if not self._precomputed_components:
             not_linear_error = (
                 "Not all free parameters are linear. "
@@ -1142,11 +1139,6 @@ class BaseModel(list):
                 if component.active:
                     self._append_component(component)
         
-            try:
-                self._is_multifit
-            except AttributeError:
-                self._is_multifit = False
-            
             if self._is_multifit:
                 self._precomputed_components = True
 
