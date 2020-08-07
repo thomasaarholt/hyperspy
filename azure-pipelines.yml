@@ -13,14 +13,14 @@ trigger:
     # build on all branches
     - '*'
 
-resources:
-  repositories:
-    - repository: templates
-      type: github
-      name: thomasaarholt/ci-scripts
-      # For more details on service connection endpoint, see
-      # https://docs.microsoft.com/en-us/azure/devops/pipelines/library/service-endpoints
-      endpoint: hyperspy # Azure DevOps service connection
+#resources:
+# repositories:
+#    - repository: templates
+#      type: github
+#      name: thomasaarholt/ci-scripts
+#      # For more details on service connection endpoint, see
+#      # https://docs.microsoft.com/en-us/azure/devops/pipelines/library/service-endpoints
+#      endpoint: hyperspy # Azure DevOps service connection
 
 strategy:
   matrix:
