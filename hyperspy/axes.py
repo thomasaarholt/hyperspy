@@ -32,6 +32,7 @@ from hyperspy.misc.math_tools import isfloat
 from hyperspy.ui_registry import add_gui_method, get_gui
 from hyperspy.defaults_parser import preferences
 
+from time import time
 
 import warnings
 
@@ -973,6 +974,7 @@ class AxesManager(t.HasTraits):
             iteration.
 
         """
+        time.sleep(5)
         if self._iterpath not in ['serpentine', 'flyback']:
             raise ValueError('''The iterpath scan pattern is set to {}. \
             It must be either "serpentine" or "flyback", and is set either \
