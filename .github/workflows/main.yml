@@ -25,6 +25,7 @@ jobs:
         python-version: "3.8"
     - name: Install dependencies
       run: |
+        python -V
         echo installing...
         conda install pip
         echo installed pip
