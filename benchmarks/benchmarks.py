@@ -27,3 +27,5 @@ class TimeSuite:
 class MemSuite:
     def mem_list(self):
         return [0] * 256
+
+    
