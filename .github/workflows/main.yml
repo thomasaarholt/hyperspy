@@ -19,9 +19,13 @@ jobs:
     steps:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v2
+      with:
+        ref: master
+    - uses: actions/checkout@v2
     
     - name: Print git status
       run: |
+        echo PR
         git status
         git fetch origin master # upstream RELEASE_next_minor
 
