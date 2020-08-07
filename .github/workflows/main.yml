@@ -37,3 +37,4 @@ jobs:
         asv run $GITHUB_HEAD_REF^!
         asv compare $GITHUB_HEAD_REF^! HEAD^!
         echo Finished!
+        
