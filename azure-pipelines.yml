@@ -20,7 +20,7 @@ resources:
       name: thomasaarholt/hyperspy
       # For more details on service connection endpoint, see
       # https://docs.microsoft.com/en-us/azure/devops/pipelines/library/service-endpoints
-      #endpoint: hyperspy # Azure DevOps service connection
+      endpoint: thomasaarholt # Azure DevOps service connection
 
 strategy:
   matrix:
