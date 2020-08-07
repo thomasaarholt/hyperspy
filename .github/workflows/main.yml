@@ -20,9 +20,7 @@ jobs:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v2
       with:
-        ref: master
-    - uses: actions/checkout@v2
-    
+        fetch-depth: 0
     - name: Print git status
       run: |
         echo PR
