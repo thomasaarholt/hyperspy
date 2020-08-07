@@ -18,7 +18,7 @@
 
 import copy
 import math
-
+import time
 import numpy as np
 import dask.array as da
 import traits.api as t
