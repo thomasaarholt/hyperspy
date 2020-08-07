@@ -33,11 +33,7 @@ jobs:
       run: echo Hello, world!
 
     # Runs a set of commands using the runners shell
-    - name: Setup asv
-      run: |
-        echo HI THERE
-        echo ITS PARTY TIME
-        asv quickstart --top-level
+
     - name: setup 2
       run: |
         echo hi
