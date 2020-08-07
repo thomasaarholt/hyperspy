@@ -28,9 +28,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -V
-        echo installing...
         conda install pip
-        echo installed pip
         pip install .[tests]
         pip install asv
     
@@ -38,14 +36,13 @@ jobs:
       run: |
         asv machine --yes
         
-    - name: run asv
+    - name: Run 
       run: |
-        echo PART 3
+        # Get IDs of PR and branch commits
         BRANCH_COMMIT_ID=$(git rev-parse origin/master)
-        echo $BRANCH_COMMIT_ID
         asv run $BRANCH_COMMIT_ID^! # upstream/RELEASE_next_minor
         HEAD_COMMIT_ID=$(git rev-parse HEAD)
-        echo $HEAD_COMMIT_ID
         asv run $HEAD_COMMIT_ID^!
+    - name: Compare Benchmarks
+      run: |
         asv compare $BRANCH_COMMIT_ID^! $HEAD_COMMIT_ID^!
-        echo Finished!
