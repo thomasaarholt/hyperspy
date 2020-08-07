@@ -1,0 +1,190 @@
+# Benchmark a large number of commits on specified platforms,
+# from FIRST_COMMIT to and including FINAL_COMMIT
+
+# Performs the following actions:
+
+name: Four Hundred Commits Linux / Win
+
+env:
+  FIRST_COMMIT: 534812e
+  FINAL_COMMIT: b56ee0d
+  STEPS: 400
+
+on:
+  workflow_dispatch:
+    branches: [ master ] # Change to RELEASE_next_minor
+
+defaults:
+  run:
+    shell: bash -l {0}
+    
+jobs:
+  Benchmark_commit: # Name of job
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+    - name: Checkout hyperspy-bench/gh-pages
+      uses: actions/checkout@v2
+      with:
+        repository: thomasaarholt/hyperspy-bench
+        ref: gh-pages
+        token: ${{ secrets.BENCHMARK_PAT }}
+
+    - name: Ensure Results directory exists
+      run: mkdir -p results
+
+    - name: Upload old results
+      uses: actions/upload-artifact@v2
+      with:
+        name: asv_old_results
+        path: results
+
+    - name: Upload configuration file
+      uses: actions/upload-artifact@v2
+      with:
+        name: asv_conf_json
+        path: asv.conf.json
+
+    - name: Checkout hyperspy
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: Setup Miniconda
+      uses: goanpeca/setup-miniconda@v1
+      with:
+        python-version: "3.8"
+
+    - name: Install ASV
+      run: |
+        pip install asv
+    
+    - name: Download ASV config
+      uses: actions/download-artifact@v2
+      with:
+        name: asv_conf_json
+
+    - name: Set ASV config
+      run: asv machine --machine ${{ matrix.os }}
+
+    - name: Run Benchmarks
+      run: asv run $FIRST_COMMIT..$FINAL_COMMIT --steps=$STEPS --machine ${{ matrix.os }}
+
+    - name: Upload new results    
+      uses: actions/upload-artifact@v2
+      with:
+        name: asv_new_results
+        path: results
+
+    - name: Checkout hyperspy-bench / gh-pages
+      uses: actions/checkout@v2
+      with:
+        repository: thomasaarholt/hyperspy-bench
+        ref: gh-pages
+        token: ${{ secrets.BENCHMARK_PAT }}
+
+    # Minimize time between git pull and push to avoid race conditions between OS jobs
+    - name: Git pull
+      run: |
+        git config --global user.email "thomasaarholt@gmail.com"
+        git config --global user.name "Thomas Aarholt"
+        git pull
+
+    - name: Download new results
+      uses: actions/download-artifact@v2
+      with:
+        name: asv_new_results
+        path: new_results
+      
+    - name: Copy over and push new results
+      run: |
+        cp -vpr new_results/* results/
+
+        git add results/
+        git status
+        git commit -m "Added Results"
+        git push
+
+  Publish_Result: # Name of job
+    needs: Benchmark_commit
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout hyperspy-bench/gh-pages
+      uses: actions/checkout@v2
+      with:
+        repository: thomasaarholt/hyperspy-bench
+        ref: gh-pages
+        token: ${{ secrets.BENCHMARK_PAT }}
+
+    - name: Upload All Results
+      uses: actions/upload-artifact@v2
+      with:
+        name: asv_results
+        path: results
+
+    - name: Upload configuration file
+      uses: actions/upload-artifact@v2
+      with:
+        name: asv_conf_json
+        path: asv.conf.json
+
+    - name: Checkout hyperspy
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: Setup Miniconda
+      uses: goanpeca/setup-miniconda@v1
+      with:
+        python-version: "3.8"
+
+    - name: Install ASV
+      run: |
+        pip install asv
+    
+    - name: Download ASV config
+      uses: actions/download-artifact@v2
+      with:
+        name: asv_conf_json
+
+    - name: Download Results
+      uses: actions/download-artifact@v2
+      with:
+        name: asv_results
+        path: results
+
+    - name: Set ASV config
+      run: asv machine --machine publisher
+
+    - name: Generate html
+      run: asv publish
+
+    - name: Upload html
+      uses: actions/upload-artifact@v2
+      with:
+        name: asv_html
+        path: html
+
+    - name: Checkout hyperspy-bench / gh-pages
+      uses: actions/checkout@v2
+      with:
+        repository: thomasaarholt/hyperspy-bench
+        ref: gh-pages
+        token: ${{ secrets.BENCHMARK_PAT }}
+
+    - name: Download and overwrite html
+      uses: actions/download-artifact@v2
+      with:
+        name: asv_html
+
+    - name: Push changes to gh-pages
+      run: |
+        git config --global user.email "thomasaarholt@gmail.com"
+        git config --global user.name "Thomas Aarholt"
+        git add --all
+        git commit -m "Added Benchmark Result"
+        git push
