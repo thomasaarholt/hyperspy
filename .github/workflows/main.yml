@@ -22,9 +22,10 @@ jobs:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v2
     - uses: actions/setup-python@v1
+    - name: Setup Miniconda
+      uses: goanpeca/setup-miniconda@v1.6.0      
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
         pip install .[tests]
         pip install asv
     # Runs a single command using the runners shell
@@ -34,6 +35,7 @@ jobs:
     # Runs a set of commands using the runners shell
     - name: Run a multi-line script
       run: |
+        asv quickstart --top-level
         asv machine --yes
         echo $GITHUB_HEAD_REF
         asv run HEAD^!
