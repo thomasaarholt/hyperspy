@@ -973,6 +973,7 @@ class AxesManager(t.HasTraits):
             iteration.
 
         """
+        time.sleep(2)
         if self._iterpath not in ['serpentine', 'flyback']:
             raise ValueError('''The iterpath scan pattern is set to {}. \
             It must be either "serpentine" or "flyback", and is set either \
