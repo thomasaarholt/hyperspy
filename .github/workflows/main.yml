@@ -19,10 +19,15 @@ jobs:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v2
     - name: Setup Miniconda
-      uses: goanpeca/setup-miniconda@v1.6.0      
+      uses: goanpeca/setup-miniconda@v1.6.0
+      with:
+        auto-update-conda: true
+        python-version: "3.8"
     - name: Install dependencies
       run: |
         echo installing...
+        conda install pip
+        echo installed pip
         pip install .[tests]
         pip install asv
     # Runs a single command using the runners shell
