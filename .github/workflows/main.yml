@@ -9,7 +9,9 @@ on:
     #branches: [ master ]
   pull_request:
     branches: [ master ]
-
+  workflow_dispatch:
+     tags:
+        description: 'Test scenario tags'  
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   # This workflow contains a single job called "build"
@@ -21,7 +23,6 @@ jobs:
     steps:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v2
-    - uses: actions/setup-python@v1
     - name: Setup Miniconda
       uses: goanpeca/setup-miniconda@v1.6.0      
     - name: Install dependencies
@@ -36,7 +37,9 @@ jobs:
     - name: Run a multi-line script
       run: |
         asv quickstart --top-level
+        echo hi
         asv machine --yes
+        echo hello
         echo $GITHUB_HEAD_REF
         asv run HEAD^!
         asv run $GITHUB_HEAD_REF^!
