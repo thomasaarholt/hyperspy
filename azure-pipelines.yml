@@ -17,7 +17,7 @@ resources:
   repositories:
     - repository: templates
       type: github
-      name: thomasaarholt/hyperspy
+      name: thomasaarholt/ci-scripts
       # For more details on service connection endpoint, see
       # https://docs.microsoft.com/en-us/azure/devops/pipelines/library/service-endpoints
       endpoint: thomasaarholt # Azure DevOps service connection
