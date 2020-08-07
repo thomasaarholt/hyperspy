@@ -45,6 +45,6 @@ jobs:
         echo PART 3
         echo $GITHUB_HEAD_REF
         asv run HEAD^!
-        asv run $GITHUB_HEAD_REF^!
-        asv compare $GITHUB_HEAD_REF^! HEAD^!
+        asv run master^! # upstream/RELEASE_next_minor
+        asv compare master^! HEAD^!
         echo Finished!
