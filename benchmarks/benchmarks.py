@@ -10,7 +10,7 @@ class TimeSuite:
     of iterating over dictionaries in Python.
     """
     def setup(self):
-        pass
+        pass 
 
     def execute(self, command):
         call((executable, '-c', command))
