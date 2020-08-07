@@ -50,8 +50,7 @@ jobs:
     - name: run asv
       run: |
         echo PART 3
-        echo $GITHUB_HEAD_REF
+        asv run origin/master^! # upstream/RELEASE_next_minor
         asv run HEAD^!
-        asv run master^! # upstream/RELEASE_next_minor
-        asv compare master^! HEAD^!
+        asv compare origin/master^! HEAD^!
         echo Finished!
