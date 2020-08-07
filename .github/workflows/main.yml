@@ -21,11 +21,7 @@ jobs:
     - uses: actions/checkout@v2
       with:
         fetch-depth: 0
-    - name: Print git status
-      run: |
-        echo PR
-        git branch
-        
+
     - name: Setup Python
       uses: actions/setup-python@v2
 
@@ -40,14 +36,16 @@ jobs:
     
     - name: setup asv
       run: |
-        echo hi
         asv machine --yes
-        echo hello
         
     - name: run asv
       run: |
         echo PART 3
-        asv run origin/master^! # upstream/RELEASE_next_minor
-        asv run HEAD^!
-        asv compare origin/master^! HEAD^!
+        BRANCH_COMMIT_ID=$(git rev-parse origin/master)
+        echo $BRANCH_COMMIT_ID
+        asv run $BRANCH_COMMIT_ID^! # upstream/RELEASE_next_minor
+        HEAD_COMMIT_ID=$(git rev-parse HEAD)
+        echo $HEAD_COMMIT_ID
+        asv run $HEAD_COMMIT_ID^!
+        asv compare $BRANCH_COMMIT_ID^! $HEAD_COMMIT_ID^!
         echo Finished!
