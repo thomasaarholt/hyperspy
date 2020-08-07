@@ -9,7 +9,7 @@ on:
   #push:
     #branches: [ master ]
   pull_request:
-    branches: [ master ]
+    branches: [ master ] 
 jobs:
   build: # manual_deploy:
     # The type of runner that the job will run on
