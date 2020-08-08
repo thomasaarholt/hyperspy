@@ -87,6 +87,8 @@ jobs:
         asv publish --html-dir html
         echo 3
         ls -a
+        git config --global user.email "thomasaarholt@gmail.com"
+        git config --global user.name "Thomas Aarholt"
         git add --all
         echo 4
         ls -a
