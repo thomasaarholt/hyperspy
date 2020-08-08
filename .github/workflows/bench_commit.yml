@@ -42,6 +42,7 @@ jobs:
       run: |
         asv machine --yes --machine generic_name
         #asv run
+        git tag -l | awk '{ print $1 "^!" }'
         asv run `git tag -l | awk '{ print $1 "^!" }'`
         
     - uses: actions/upload-artifact@v2
