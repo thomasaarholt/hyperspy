@@ -45,4 +45,7 @@ jobs:
         asv run $HEAD_COMMIT_ID^!
     - name: Compare Benchmarks
       run: |
-        asv compare $BRANCH_COMMIT_ID^! $HEAD_COMMIT_ID^!
+        echo The following two are the commit ids that are to be compared:
+        echo $BRANCH_COMMIT_ID
+        echo $HEAD_COMMIT_ID
+        asv compare $BRANCH_COMMIT_ID $HEAD_COMMIT_ID
