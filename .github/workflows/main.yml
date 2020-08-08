@@ -43,8 +43,6 @@ jobs:
         asv run $BRANCH_COMMIT_ID^! # upstream/RELEASE_next_minor
         HEAD_COMMIT_ID=$(git rev-parse HEAD)
         asv run $HEAD_COMMIT_ID^!
-    - name: Compare Benchmarks
-      run: |
         echo The following two are the commit ids that are to be compared:
         echo $BRANCH_COMMIT_ID
         echo $HEAD_COMMIT_ID
