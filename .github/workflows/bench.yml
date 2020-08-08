@@ -37,6 +37,9 @@ jobs:
         ls 
         cd results
         ls
+        cd action
+        echo HERE:
+        ls
 
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
 #     - name: Checkout 
