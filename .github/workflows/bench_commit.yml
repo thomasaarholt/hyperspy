@@ -72,6 +72,7 @@ jobs:
         git config --global user.name "Thomas Aarholt"
         git add --all
         git commit -m "Added Benchmark Result"
+        git push
         asv publish --html-dir html
     - uses: actions/upload-artifact@v2
       with:
