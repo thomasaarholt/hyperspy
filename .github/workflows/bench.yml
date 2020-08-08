@@ -90,6 +90,7 @@ jobs:
         git add --all
         echo 4
         ls -a
+        git commit -m "Updated Benchmark"
         git status
         echo 5
         git push
