@@ -22,7 +22,9 @@ jobs:
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
     - uses: actions/checkout@v2
-      
+      with:
+        fetch-depth: 0
+
     - uses: goanpeca/setup-miniconda@v1
       with:
         activate-environment: test_env
