@@ -18,9 +18,16 @@ jobs:
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
     - uses: actions/checkout@v2
-    - name: Setup Python
-      uses: actions/setup-python@v2
-
+      
+    - uses: goanpeca/setup-miniconda@v1
+      with:
+        activate-environment: test_env
+        environment-file: conda_environment.yml
+        python-version: 3.7
+    - shell: bash -l {0}
+      run: |
+        conda info
+        conda list
     - name: Install dependencies
       run: |
         python -V
