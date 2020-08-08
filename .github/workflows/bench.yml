@@ -30,10 +30,12 @@ jobs:
     
     - name: setup asv
       run: |
-        asv machine --yes
+        asv machine --yes --machine action
         asv run
-        ls
-        cd benchmarks
+        ls -a
+        cd .asv
+        ls 
+        cd results
         ls
 
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
