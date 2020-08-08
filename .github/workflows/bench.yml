@@ -69,13 +69,15 @@ jobs:
         name: asv_conf #my-artifact
     - run: |
         mkdir -p .asv
+        cd .asv
+        mkdir -p results
         #mkdir -p generic_name
         #cd generic_name
         
     - uses: actions/download-artifact@v2
       with:
         name: asv_results #my-artifact
-        path: .asv
+        path: .asv/results
     - run: |
         cd .asv
         ls -a
