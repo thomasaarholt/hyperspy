@@ -6,7 +6,7 @@ name: Automatic Benchmarking
 # events but only for the master branch
 on:
   push:
-    branches: [ master ] 
+    branches: [ master ]  
 
 defaults:
   run:
