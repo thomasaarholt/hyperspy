@@ -8,6 +8,10 @@ on:
   push:
     branches: [ master ]
 
+defaults:
+  run:
+    shell: bash -l {0}
+    
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   # This workflow contains a single job called "build"
@@ -23,13 +27,12 @@ jobs:
       with:
         activate-environment: test_env
         environment-file: conda_environment.yml
-        python-version: 3.7
-    - shell: bash -l {0}
-      run: |
+        python-version: "3.7"
+    - run: |
         conda info
         conda list
-    - name: Install dependencies
-      run: |
+        which python
+        which python3
         python -V
         conda install pip
         pip install .[tests]
@@ -45,9 +48,21 @@ jobs:
         path: .asv/results/generic_name/*.json
 
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-#     - name: Checkout 
-#       uses: actions/checkout@v2
-#       with:
-#         repository: thomasaarholt/hyperspy-bench
-#         token: ${{ secrets.BENCHMARK_PAT }}
+    - name: Checkout 
+      uses: actions/checkout@v2
+      with:
+        repository: thomasaarholt/hyperspy-bench
+        token: ${{ secrets.BENCHMARK_PAT }}
     # Runs a set of commands using the runners shell
+    - run: |
+        mkdir -p results
+        cd results
+        mkdir -p generic_name
+        cd generic_name
+        
+    - uses: actions/download-artifact@v2
+      with:
+        name: my-artifact
+    - run: |
+        git status
+        
