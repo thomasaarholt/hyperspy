@@ -79,7 +79,7 @@ jobs:
     - run: |
         echo 1
         ls
-        asv publish --html-dir .
+        asv publish --html-dir html
         echo 3
         ls
         git add --all
