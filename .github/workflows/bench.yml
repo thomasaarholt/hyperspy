@@ -44,7 +44,7 @@ jobs:
         asv run
     - uses: actions/upload-artifact@v2
       with:
-        name: asv_conf
+        name: asv_config
         path: asv.conf.json
         
     - uses: actions/upload-artifact@v2
@@ -62,11 +62,12 @@ jobs:
       uses: actions/checkout@v2
       with:
         repository: thomasaarholt/hyperspy-bench
+        ref: master
         token: ${{ secrets.BENCHMARK_PAT }}
     # Runs a set of commands using the runners shell
     - uses: actions/download-artifact@v2
       with:
-        name: asv_conf #my-artifact
+        name: asv_config #my-artifact
     - run: |
         mkdir -p .asv
         cd .asv
@@ -78,13 +79,31 @@ jobs:
       with:
         name: asv_results #my-artifact
         path: .asv/results
+
     - run: |
-        cd .asv
-        ls -a
-        cd ..
-        echo 1
         ls -a
         git config --global user.email "thomasaarholt@gmail.com"
         git config --global user.name "Thomas Aarholt"
+        git add --all
+        git commit -m "Added Benchmark Result"
         asv publish --html-dir html
-        asv gh-pages
+
+    - uses: actions/upload-artifact@v2
+      with:
+        name: asv_html
+        path: html
+
+    - name: Checkout 
+      uses: actions/checkout@v2
+      with:
+        repository: thomasaarholt/hyperspy-bench
+        ref: gh-pages
+        token: ${{ secrets.BENCHMARK_PAT }}
+    - run: rm -rf *
+    - uses: actions/download-artifact@v2
+      with:
+        name: asv_html
+    - run: |
+        git add --all
+        git commit -m "Updating Benchmark"
+        git push
