@@ -44,13 +44,18 @@ jobs:
         asv run
     - uses: actions/upload-artifact@v2
       with:
-        name: asv
-        path: .asv
-
+        name: asv_conf
+        path: asv.conf.json
+        
     - uses: actions/upload-artifact@v2
       with:
-        name: my-artifact
-        path: .asv/results/generic_name/*.json
+        name: asv_results
+        path: .asv/results
+
+#     - uses: actions/upload-artifact@v2
+#       with:
+#         name: my-artifact
+#         path: .asv/results/generic_name/*.json
 
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - name: Checkout 
@@ -59,16 +64,22 @@ jobs:
         repository: thomasaarholt/hyperspy-bench
         token: ${{ secrets.BENCHMARK_PAT }}
     # Runs a set of commands using the runners shell
+    - uses: actions/download-artifact@v2
+      with:
+        name: asv_conf #my-artifact
     - run: |
-        mkdir -p results
-        cd results
-        mkdir -p generic_name
-        cd generic_name
+        mkdir -p .asv
+        cd .asv
+        #mkdir -p generic_name
+        #cd generic_name
         
     - uses: actions/download-artifact@v2
       with:
-        name: my-artifact
+        name: asv_results #my-artifact
     - run: |
-        cd ../../
+        cd ..
+        asv publish --html-dir .
+        git add --all
         git status
+        git push
         
