@@ -17,12 +17,30 @@ jobs:
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
+    - name: Setup Python
+      uses: actions/setup-python@v2
+
+    - name: Install dependencies
+      run: |
+        python -V
+        conda install pip
+        pip install .[tests]
+        pip install asv
+    
+    - name: setup asv
+      run: |
+        asv machine --yes
+        asv run
+        ls
+        cd benchmarks
+        ls
+
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-    - name: Checkout 
-      uses: actions/checkout@v2
-      with:
-        repository: thomasaarholt/hyperspy-bench
-        token: ${{ secrets.BENCHMARK_PAT }}
+#     - name: Checkout 
+#       uses: actions/checkout@v2
+#       with:
+#         repository: thomasaarholt/hyperspy-bench
+#         token: ${{ secrets.BENCHMARK_PAT }}
     # Runs a set of commands using the runners shell
     - name: Run a multi-line script
       run: |
