@@ -6,7 +6,7 @@ name: CI
 # events but only for the master branch
 #on: workflow_dispatch
 on:
-  #push:
+  #push: 
     #branches: [ master ]
   pull_request: 
     branches: [ master ]
