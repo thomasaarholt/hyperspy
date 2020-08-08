@@ -44,6 +44,11 @@ jobs:
         asv run
     - uses: actions/upload-artifact@v2
       with:
+        name: asv_conf
+        path: asv.conf.json
+        
+    - uses: actions/upload-artifact@v2
+      with:
         name: asv_results
         path: .asv/results
 
@@ -59,7 +64,10 @@ jobs:
         repository: thomasaarholt/hyperspy-bench
         ref: gh-pages
         token: ${{ secrets.BENCHMARK_PAT }}
-
+    # Runs a set of commands using the runners shell
+    - uses: actions/download-artifact@v2
+      with:
+        name: asv_conf #my-artifact
     - run: |
         mkdir -p .asv
         cd .asv
@@ -72,9 +80,9 @@ jobs:
         name: asv_results #my-artifact
         path: .asv/results
     - run: |
-        #cd .asv
-        #ls -a
-        #cd ..
+        cd .asv
+        ls -a
+        cd ..
         echo 1
         ls -a
         asv publish --html-dir html
@@ -89,4 +97,3 @@ jobs:
         git status
         echo 5
         git push
-        
