@@ -77,14 +77,17 @@ jobs:
         name: asv_results #my-artifact
         path: .asv
     - run: |
+        cd .asv
+        ls -a
+        cd ..
         echo 1
-        ls
+        ls -a
         asv publish --html-dir html
         echo 3
-        ls
+        ls -a
         git add --all
         echo 4
-        ls
+        ls -a
         git status
         echo 5
         git push
