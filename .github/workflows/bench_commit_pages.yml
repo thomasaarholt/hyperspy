@@ -74,10 +74,12 @@ jobs:
         asv run v1.5.2^! --machine generic_name
         asv run v1.5^! --machine generic_name
         asv run v1.4.1^! --machine generic_name
-        asv run v1.4.0^! --machine generic_name
+        asv run v1.4^! --machine generic_name
         asv run v1.3.2^! --machine generic_name
         asv run v1.3.1^! --machine generic_name
         asv run v1.2^! --machine generic_name
+        asv run v1.1.0^! --machine generic_name
+        
         
         #git tag -l | awk '{ print $1 "^!" }'
         #asv run `git tag -l | awk '{ print $1 "^!" }'`
