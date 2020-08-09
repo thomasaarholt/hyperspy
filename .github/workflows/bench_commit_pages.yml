@@ -69,12 +69,12 @@ jobs:
     - name: setup asv
       run: |
 
-        asv machine --yes --machine generic_name
-        asv run v1.5.2^!
-        #asv run v1.5^!
-        #asv run v1.4.1^!
-        #asv run v1.3.1^!
-        asv run v1.2^!
+        asv machine --machine generic_name --os test --arch test --cpu test --num_cpu 1 --ram '1GB' 
+        #asv run v1.5.2^! --machine generic_name
+        #asv run v1.5^! --machine generic_name
+        #asv run v1.4.1^! --machine generic_name
+        #asv run v1.3.1^! --machine generic_name
+        asv run v1.2^! --machine generic_name
         
         #git tag -l | awk '{ print $1 "^!" }'
         #asv run `git tag -l | awk '{ print $1 "^!" }'`
