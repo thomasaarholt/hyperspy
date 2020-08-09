@@ -1,11 +1,11 @@
 # This is a basic workflow to help you get started with Actions
 
-name: Automatic Benchmarking on Commit to gh-pages
+name: Five Hundred Commits
 
 # Controls when the action will run. Triggers the workflow on push or pull request
 # events but only for the master branch
 on:
-  push:
+  workflow_dispatch:
     branches: [ master ] # Change to RELEASE_next_minor
 
 defaults:
