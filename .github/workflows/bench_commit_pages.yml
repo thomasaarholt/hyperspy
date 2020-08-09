@@ -42,7 +42,7 @@ jobs:
         path: asv.conf.json
 
     - name: Checkout hyperspy
-    - uses: actions/checkout@v2
+      uses: actions/checkout@v2
       with:
         fetch-depth: 0
 
