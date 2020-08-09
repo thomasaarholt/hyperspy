@@ -6,7 +6,7 @@ name: Automatic Benchmarking on Commit to gh-pages
 # events but only for the master branch
 on:
   push:
-    branches: [ master ] # Change to RELEASE_next_minor
+    branches: [ master ] # Change to RELEASE_next_minor 
 
 defaults:
   run:
