@@ -69,5 +69,5 @@ jobs:
         echo $BRANCH_COMMIT_ID | tee -a commit_list.txt
         echo $GITHUB_SHA | tee -a commit_list.txt # Current commit
 
-        asv run HASHFILE:commit_list.txt
+        asv run HASHFILE:commit_list.txt --machine ${{ matrix.os }}
         asv compare $BRANCH_COMMIT_ID $GITHUB_SHA
