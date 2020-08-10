@@ -51,6 +51,8 @@ jobs:
         activate-environment: test_env
         environment-file: conda_environment.yml
         python-version: "3.7"
+    
+    - name: Install HyperSpy and ASV
     - run: |
         conda install pip
         pip install .
@@ -60,6 +62,8 @@ jobs:
       uses: actions/download-artifact@v2
       with:
         name: asv_conf_json
+
+    - name: Set ASV config
       run: |
         asv machine --machine generic_name --os test --arch test --cpu test --num_cpu 1 --ram '1GB' 
 
