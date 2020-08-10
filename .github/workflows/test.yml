@@ -12,7 +12,7 @@
 #   Add results (overwriting old) and overwrite website
 #   Push changes
 
-name: Five Hundred Commits
+name: Test Github Action
 
 env:
   FIRST_COMMIT: 534812e
