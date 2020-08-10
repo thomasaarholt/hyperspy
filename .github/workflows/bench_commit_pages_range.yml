@@ -1,6 +1,23 @@
-# This is a basic workflow to help you get started with Actions
+# Benchmark a number of commits from a start commit to finish commit
+# Performs the following actions:
+#   Checkout hyperspy-bench / gh-pages
+#   Upload previous results and config file to GH artifact
+#   Checkout RELEASE_next_minor
+#   Install python, hyperspy and asv
+#   Run specified range of commits with steps between them (see below)
+#   Upload new results to GH artifact
+#   Download and merge previous results without overwriting
+#   Generate website and upload website to GH artifact
+#   Checkout hyperspy-bench/gh-pages
+#   Add results (overwriting old) and overwrite website
+#   Push changes
 
 name: Five Hundred Commits
+
+env:
+  FIRST_COMMIT: 534812e
+  FINAL_COMMIT: b56ee0d
+  STEPS: 3  # This workflow contains a single job called "build"
 
 # Controls when the action will run. Triggers the workflow on push or pull request
 # events but only for the master branch
@@ -14,14 +31,12 @@ defaults:
     
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
   build:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-
     - name: Checkout hyperspy-bench/gh-pages
       uses: actions/checkout@v2
       with:
@@ -59,16 +74,15 @@ jobs:
         which python3
         python -V
         conda install pip
-        pip install .[tests]
+        pip install .
         pip install asv
     
     - uses: actions/download-artifact@v2
       with:
-        name: asv_conf #my-artifact
+        name: asv_conf
 
     - name: setup asv
       run: |
-
         asv machine --machine generic_name --os test --arch test --cpu test --num_cpu 1 --ram '1GB' 
         #asv run v1.6.0^! --machine generic_name
         #asv run v1.5.2^! --machine generic_name
@@ -81,17 +95,19 @@ jobs:
         #asv run v1.1.0^! --machine generic_name
         
         
-        asv run 534812e..b56ee0d --steps 500 --machine generic_name
+        asv run $FIRST_COMMIT..$FINAL_COMMIT --steps $STEPS --machine generic_name
         
     - uses: actions/upload-artifact@v2
       with:
         name: asv_new_results
         path: results
 
-#    - uses: actions/download-artifact@v2
-#      with:
-#        name: asv_old_results
-#        path: results
+    - uses: actions/download-artifact@v2
+      with:
+        name: asv_old_results
+        path: old_results
+    # Merge old results into new results without overwriting
+    - run: mv -n old_results/*.json ../results/
 
     - run: |
         asv publish
@@ -99,11 +115,6 @@ jobs:
       with:
         name: asv_html
         path: html
-
-#     - uses: actions/upload-artifact@v2
-#       with:
-#         name: my-artifact
-#         path: .asv/results/generic_name/*.json
 
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - name: Checkout 
@@ -115,12 +126,12 @@ jobs:
 
     - uses: actions/download-artifact@v2
       with:
-        name: asv_new_results #my-artifact
+        name: asv_new_results
         path: results
 
     - uses: actions/download-artifact@v2
       with:
-        name: asv_html #my-artifact
+        name: asv_html
 
     - run: |
         ls -a

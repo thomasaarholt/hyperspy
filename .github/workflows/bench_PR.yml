@@ -1,4 +1,16 @@
-# This is a basic workflow to help you get started with Actions
+# Benchmark latest commit of PR against upstream repo
+# Performs the following actions:
+#   Checkout hyperspy-bench / gh-pages
+#   Upload previous results and config file to GH artifact
+#   Checkout RELEASE_next_minor
+#   Install python, hyperspy and asv
+#   Run specified range of commits with steps between them (see below)
+#   Upload new results to GH artifact
+#   Download and merge previous results without overwriting
+#   Generate website and upload website to GH artifact
+#   Checkout hyperspy-bench/gh-pages
+#   Add results (overwriting old) and overwrite website
+#   Push changes
 
 name: Benchmark PR against Upstream
 

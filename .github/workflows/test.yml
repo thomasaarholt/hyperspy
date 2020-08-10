@@ -1,0 +1,45 @@
+# Benchmark a number of commits from a start commit to finish commit
+# Performs the following actions:
+#   Checkout hyperspy-bench / gh-pages
+#   Upload previous results and config file to GH artifact
+#   Checkout RELEASE_next_minor
+#   Install python, hyperspy and asv
+#   Run specified range of commits with steps between them (see below)
+#   Upload new results to GH artifact
+#   Download and merge previous results without overwriting
+#   Generate website and upload website to GH artifact
+#   Checkout hyperspy-bench/gh-pages
+#   Add results (overwriting old) and overwrite website
+#   Push changes
+
+name: Five Hundred Commits
+
+env:
+  FIRST_COMMIT: 534812e
+  FINAL_COMMIT: b56ee0d
+  STEPS: 3  # This workflow contains a single job called "build"
+
+# Controls when the action will run. Triggers the workflow on push or pull request
+# events but only for the master branch
+on:
+  workflow_dispatch:
+    branches: [ master ] # Change to RELEASE_next_minor
+
+defaults:
+  run:
+    shell: bash -l {0}
+    
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+    - run: |
+        echo $FIRST_COMMIT
+        echo NOW:
+        echo $GITHUB_SHA
+        HEAD_COMMIT_ID=$(git rev-parse HEAD)
+        echo $HEAD_COMMIT_ID
