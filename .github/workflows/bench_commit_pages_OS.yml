@@ -31,7 +31,7 @@ defaults:
     shell: bash -l {0}
     
 jobs:
-  Benchmark_Results: # Name of job
+  Benchmark_commit: # Name of job
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -116,6 +116,7 @@ jobs:
         git push
 
   Publish_Result: # Name of job
+    needs: Benchmark_commit
     runs-on: ubuntu-latest
 
     steps:
