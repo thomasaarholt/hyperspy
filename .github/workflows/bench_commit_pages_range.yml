@@ -91,12 +91,16 @@ jobs:
         name: asv_old_results
         path: old_results
 
-    # Merge old results into new results without overwriting
-    - run: mv -n old_results/*.json ../results/
+    - name: Merge old into new results (without overwriting)
+      run: |
+        mkdir -p results
+        mv -n old_results/*.json ../results/
 
-    - run: |
-        asv publish
-    - uses: actions/upload-artifact@v2
+    - name: Generate html
+      run: asv publish
+
+    - name: Upload html
+      uses: actions/upload-artifact@v2
       with:
         name: asv_html
         path: html
@@ -109,17 +113,19 @@ jobs:
         ref: gh-pages
         token: ${{ secrets.BENCHMARK_PAT }}
 
-    - uses: actions/download-artifact@v2
+    - name: Download new results (overwriting any duplicates)
+      uses: actions/download-artifact@v2
       with:
         name: asv_new_results
         path: results
 
-    - uses: actions/download-artifact@v2
+    - name: Download and overwrite html
+      uses: actions/download-artifact@v2
       with:
         name: asv_html
 
-    - run: |
-        ls -a
+    - name: Push changes to gh-pages
+      run: |
         git config --global user.email "thomasaarholt@gmail.com"
         git config --global user.name "Thomas Aarholt"
         git add --all

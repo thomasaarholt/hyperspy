@@ -53,7 +53,7 @@ jobs:
         python-version: "3.7"
     
     - name: Install HyperSpy and ASV
-    - run: |
+      run: |
         conda install pip
         pip install .
         pip install asv
@@ -67,7 +67,7 @@ jobs:
       run: |
         asv machine --machine generic_name --os test --arch test --cpu test --num_cpu 1 --ram '1GB' 
 
-    - name: Run 
+    - name: Run Benchmarks
       run: |
         # Get IDs of PR and branch commits
         BRANCH_COMMIT_ID=$(git rev-parse origin/master)

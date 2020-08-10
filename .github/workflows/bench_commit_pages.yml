@@ -11,6 +11,7 @@
 #   Checkout hyperspy-bench/gh-pages
 #   Add results (overwriting old) and overwrite website
 #   Push changes
+
 name: Bench Rnm-push to gh-pages
 
 # Controls when the action will run. Triggers the workflow on push or pull request
@@ -56,67 +57,78 @@ jobs:
       with:
         fetch-depth: 0
 
-    - uses: goanpeca/setup-miniconda@v1
+    - name: Setup Miniconda
+      uses: goanpeca/setup-miniconda@v1
       with:
         activate-environment: test_env
         environment-file: conda_environment.yml
         python-version: "3.7"
 
-    - run: |
+    - name: Install HyperSpy and ASV
+      run: |
         conda install pip
         pip install .
         pip install asv
     
-    - uses: actions/download-artifact@v2
+    - name: Download ASV config
+      uses: actions/download-artifact@v2
       with:
         name: asv_conf_json
 
-    - name: setup asv
-      run: |
+    - name: Set ASV config
+      run: asv machine --machine generic_name --os test --arch test --cpu test --num_cpu 1 --ram '1GB' 
 
-        asv machine --machine generic_name --os test --arch test --cpu test --num_cpu 1 --ram '1GB' 
-        
-        asv run --machine generic_name
-        
-    - uses: actions/upload-artifact@v2
+    - name: Run Benchmarks
+      run: asv run --machine generic_name
+
+    - name: Upload new results    
+      uses: actions/upload-artifact@v2
       with:
         name: asv_new_results
         path: results
 
-    - uses: actions/download-artifact@v2
+    - name: Download and merge old results
+      uses: actions/download-artifact@v2
       with:
         name: asv_old_results
         path: old_results
 
     # Merge old results into new results without overwriting
-    - run: mv -n old_results/*.json ../results/
+    - name: Merge old into new results (without overwriting)
+      run: |
+        mkdir -p results
+        mv -n old_results/*.json ../results/
 
-    - run: |
-        asv publish
-    - uses: actions/upload-artifact@v2
+    - name: Generate html
+      run: asv publish
+
+    - name: Upload html
+      uses: actions/upload-artifact@v2
       with:
         name: asv_html
         path: html
 
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-    - name: Checkout 
+    - name: Checkout hyperspy-bench / gh-pages
       uses: actions/checkout@v2
       with:
         repository: thomasaarholt/hyperspy-bench
         ref: gh-pages
         token: ${{ secrets.BENCHMARK_PAT }}
 
-    - uses: actions/download-artifact@v2
+    - name: Download new results (overwriting any duplicates)
+      uses: actions/download-artifact@v2
       with:
         name: asv_new_results
         path: results
 
-    - uses: actions/download-artifact@v2
+    - name: Download and overwrite html
+      uses: actions/download-artifact@v2
       with:
         name: asv_html
 
-    - run: |
-        ls -a
+    - name: Push changes to gh-pages
+      run: |
         git config --global user.email "thomasaarholt@gmail.com"
         git config --global user.name "Thomas Aarholt"
         git add --all
