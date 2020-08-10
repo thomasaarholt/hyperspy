@@ -11,3 +11,4 @@ def test_bench_axes_1000(benchmark):
     benchmark.pedantic(axes_iteration, args = (s,), rounds=5, iterations=5)
     
     
+ 
