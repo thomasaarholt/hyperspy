@@ -72,5 +72,5 @@ jobs:
         echo $BRANCH_COMMIT_ID | tee -a commit_list.txt
         echo $GITHUB_SHA | tee -a commit_list.txt
 
-        asv run HASHFILE:commit_list.txt -E existing
+        asv run HASHFILE:commit_list.txt
         asv compare $BRANCH_COMMIT_ID $HEAD_COMMIT_ID
