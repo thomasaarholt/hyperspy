@@ -17,7 +17,7 @@ name: Five Hundred Commits
 env:
   FIRST_COMMIT: 534812e
   FINAL_COMMIT: b56ee0d
-  STEPS: 3  # This workflow contains a single job called "build"
+  STEPS: 3 
 
 # Controls when the action will run. Triggers the workflow on push or pull request
 # events but only for the master branch
@@ -31,7 +31,7 @@ defaults:
     
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  build:
+  Benchmark_Results: # Name of job
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
@@ -53,7 +53,7 @@ jobs:
     - name: Upload configuration file
       uses: actions/upload-artifact@v2
       with:
-        name: asv_conf
+        name: asv_conf_json
         path: asv.conf.json
 
     - name: Checkout hyperspy
@@ -68,33 +68,17 @@ jobs:
         python-version: "3.7"
 
     - run: |
-        conda info
-        conda list
-        which python
-        which python3
-        python -V
         conda install pip
         pip install .
         pip install asv
     
     - uses: actions/download-artifact@v2
       with:
-        name: asv_conf
+        name: asv_conf_json
 
     - name: setup asv
       run: |
         asv machine --machine generic_name --os test --arch test --cpu test --num_cpu 1 --ram '1GB' 
-        #asv run v1.6.0^! --machine generic_name
-        #asv run v1.5.2^! --machine generic_name
-        #asv run v1.5^! --machine generic_name
-        #asv run v1.4.1^! --machine generic_name
-        #asv run v1.4^! --machine generic_name
-        #asv run v1.3.2^! --machine generic_name
-        #asv run v1.3.1^! --machine generic_name
-        #asv run v1.2^! --machine generic_name
-        #asv run v1.1.0^! --machine generic_name
-        
-        
         asv run $FIRST_COMMIT..$FINAL_COMMIT --steps $STEPS --machine generic_name
         
     - uses: actions/upload-artifact@v2
@@ -106,6 +90,7 @@ jobs:
       with:
         name: asv_old_results
         path: old_results
+
     # Merge old results into new results without overwriting
     - run: mv -n old_results/*.json ../results/
 

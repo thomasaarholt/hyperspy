@@ -51,3 +51,10 @@ jobs:
         echo SPACE
         echo $GITHUB_CONTEXT 
         echo hello
+
+    - name: Annotate
+      uses: Attest/annotations-action@v0.1.0
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        input: 'annotations.json'
+        title: 'Annotate Files'

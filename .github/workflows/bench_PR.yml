@@ -1,18 +1,13 @@
 # Benchmark latest commit of PR against upstream repo
 # Performs the following actions:
 #   Checkout hyperspy-bench / gh-pages
-#   Upload previous results and config file to GH artifact
-#   Checkout RELEASE_next_minor
+#   Upload config file to GH artifact
+#   Checkout PR, download config
 #   Install python, hyperspy and asv
-#   Run specified range of commits with steps between them (see below)
-#   Upload new results to GH artifact
-#   Download and merge previous results without overwriting
-#   Generate website and upload website to GH artifact
-#   Checkout hyperspy-bench/gh-pages
-#   Add results (overwriting old) and overwrite website
-#   Push changes
+#   Benchmark Rnm and PR
+#   Comprae Rnm and PR
 
-name: Benchmark PR against RELEASE_next_minor
+name: Benchmark PR vs Rnm
 
 # Controls when the action will run. Triggers the workflow on push or pull request
 # events but only for the master branch
@@ -28,29 +23,46 @@ on:
     paths: '**.py' # Only trigger when changing python files
 
 jobs:
-  build:
+  Benchmark_Results: # Name of job
     runs-on: ubuntu-latest
 
     steps:
-    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-    - uses: actions/checkout@v2
+    - name: Checkout hyperspy-bench/gh-pages
+      uses: actions/checkout@v2
       with:
-        fetch-depth: 0 # get all branches and tags
+        repository: thomasaarholt/hyperspy-bench
+        ref: gh-pages
+        token: ${{ secrets.BENCHMARK_PAT }}
 
-    - name: Setup Python
-      uses: actions/setup-python@v2
+    - name: Upload configuration file
+      uses: actions/upload-artifact@v2
+      with:
+        name: asv_conf_json
+        path: asv.conf.json
 
-    - name: Install dependencies
-      run: |
-        python -V
+    - name: Checkout hyperspy
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: Setup Miniconda
+      uses: goanpeca/setup-miniconda@v1
+      with:
+        activate-environment: test_env
+        environment-file: conda_environment.yml
+        python-version: "3.7"
+    - run: |
         conda install pip
-        pip install .[tests]
+        pip install .
         pip install asv
     
-    - name: setup asv
+    - name: Download ASV config
+      uses: actions/download-artifact@v2
+      with:
+        name: asv_conf_json
       run: |
-        asv machine --yes
-        
+        asv machine --machine generic_name --os test --arch test --cpu test --num_cpu 1 --ram '1GB' 
+
     - name: Run 
       run: |
         # Get IDs of PR and branch commits
