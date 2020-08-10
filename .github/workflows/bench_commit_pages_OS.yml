@@ -20,7 +20,7 @@
 #   Checkout gh-pages
 #   Push html
 
-name: Bench Rnm-push to gh-pages
+name: Bench Rnm-push to gh-pages OS
 
 on:
   push:
