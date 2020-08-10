@@ -24,6 +24,7 @@ env:
 on:
   pull_request:
     branches: [ master ] # Change to RELEASE_next_minor
+    paths: '.github/workflows/test.yml' # Only trigger changing this file
 
 defaults:
   run:
