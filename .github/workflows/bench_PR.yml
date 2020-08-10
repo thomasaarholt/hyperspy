@@ -58,9 +58,8 @@ jobs:
         echo BRANCH_COMMIT_ID
         asv run $BRANCH_COMMIT_ID^! # upstream/RELEASE_next_minor
         
-        HEAD_COMMIT_ID=$(git rev-parse HEAD)
-        echo $HEAD_COMMIT_ID
-        asv run $HEAD_COMMIT_ID^!
+        echo $GITHUB_SHA^!
+        asv run $GITHUB_SHA^!
     - name: Compare Benchmarks
       run: |
         asv compare $BRANCH_COMMIT_ID^! $HEAD_COMMIT_ID^!
