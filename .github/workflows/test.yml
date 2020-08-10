@@ -48,3 +48,4 @@ jobs:
         echo SPACE
         echo SPACE
         echo $GITHUB_CONTEXT 
+        echo hello
