@@ -67,14 +67,12 @@ jobs:
       run: |
         asv machine --machine generic_name --os test --arch test --cpu test --num_cpu 1 --ram '1GB' 
 
-    - name: Run Benchmarks
+    - name: Run and Compare Benchmarks
       run: |
         # Get IDs of PR and branch commits
         BRANCH_COMMIT_ID=$(git rev-parse origin/master)
         echo $BRANCH_COMMIT_ID | tee -a commit_list.txt
         echo $GITHUB_SHA | tee -a commit_list.txt
 
-        asv run HASHFILE:commit_list.txt
-    - name: Compare Benchmarks
-      run: |
+        asv run HASHFILE:commit_list.txt -E existing
         asv compare $BRANCH_COMMIT_ID $HEAD_COMMIT_ID
