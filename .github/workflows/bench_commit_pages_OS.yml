@@ -17,7 +17,7 @@ name: Bench Rnm-push to gh-pages
 # Controls when the action will run. Triggers the workflow on push or pull request
 # events but only for the master branch
 on:
-  workflow_dispatch: # Change to push
+  push:
     branches: [ master ] # Change to RELEASE_next_minor
 
 defaults:
@@ -29,7 +29,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, windows-latest]
 
     steps:
     - name: Checkout hyperspy-bench/gh-pages
@@ -38,6 +38,9 @@ jobs:
         repository: thomasaarholt/hyperspy-bench
         ref: gh-pages
         token: ${{ secrets.BENCHMARK_PAT }}
+
+    - name: Ensure Results directory exists
+      run: mkdir -p results
 
     - name: Upload old results
       uses: actions/upload-artifact@v2
@@ -83,17 +86,15 @@ jobs:
         name: asv_new_results
         path: results
 
-    - name: Download and merge old results
+    - name: Download old results
       uses: actions/download-artifact@v2
       with:
         name: asv_old_results
         path: old_results
 
-    # Merge old results into new results without overwriting
     - name: Merge old into new results (without overwriting)
       run: |
-        mkdir -p results
-        mv -n old_results/*.json ../results/
+        cp -vnpr old_results/* results/
 
     - name: Generate html
       run: asv publish
@@ -104,7 +105,6 @@ jobs:
         name: asv_html
         path: html
 
-    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - name: Checkout hyperspy-bench / gh-pages
       uses: actions/checkout@v2
       with:
@@ -125,6 +125,7 @@ jobs:
 
     - name: Push changes to gh-pages
       run: |
+        rm -rf old_results # Delete old results
         git config --global user.email "thomasaarholt@gmail.com"
         git config --global user.name "Thomas Aarholt"
         git add --all
