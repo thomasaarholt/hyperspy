@@ -47,4 +47,4 @@ jobs:
         echo "$GITHUB_CONTEXT"
         echo SPACE
         echo SPACE
-        echo $GITHUB_CONTEXT
+        echo $GITHUB_CONTEXT 
