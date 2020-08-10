@@ -71,11 +71,10 @@ jobs:
       run: |
         # Get IDs of PR and branch commits
         BRANCH_COMMIT_ID=$(git rev-parse origin/master)
-        echo BRANCH_COMMIT_ID
-        asv run $BRANCH_COMMIT_ID^! # upstream/RELEASE_next_minor
-        
-        echo $GITHUB_SHA^!
-        asv run $GITHUB_SHA^!
+        echo $BRANCH_COMMIT_ID | tee -a commit_list.txt
+        echo $GITHUB_SHA | tee -a commit_list.txt
+
+        asv run HASHFILE:commit_list.txt
     - name: Compare Benchmarks
       run: |
-        asv compare $BRANCH_COMMIT_ID^! $HEAD_COMMIT_ID^!
+        asv compare $BRANCH_COMMIT_ID $HEAD_COMMIT_ID
