@@ -43,3 +43,8 @@ jobs:
         echo $GITHUB_SHA
         HEAD_COMMIT_ID=$(git rev-parse HEAD)
         echo $HEAD_COMMIT_ID
+        echo MORE
+        echo "$GITHUB_CONTEXT"
+        echo SPACE
+        echo SPACE
+        echo $GITHUB_CONTEXT
