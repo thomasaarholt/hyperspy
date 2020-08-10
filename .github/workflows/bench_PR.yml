@@ -45,9 +45,16 @@ jobs:
       with:
         fetch-depth: 0
 
+    - name: Setup Miniconda
+      uses: goanpeca/setup-miniconda@v1
+      with:
+        python-version: "3.8"
+    
     - name: Install HyperSpy and ASV
       run: |
-        pip3 install asv
+        conda install pip
+        which pip
+        pip install asv
     
     - name: Download ASV config
       uses: actions/download-artifact@v2
