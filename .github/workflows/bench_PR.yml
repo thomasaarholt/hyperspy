@@ -45,18 +45,9 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Setup Miniconda
-      uses: goanpeca/setup-miniconda@v1
-      with:
-        activate-environment: test_env
-        environment-file: conda_environment.yml
-        python-version: "3.7"
-    
     - name: Install HyperSpy and ASV
       run: |
-        conda install pip
-        pip install .
-        pip install asv
+        pip3 install asv
     
     - name: Download ASV config
       uses: actions/download-artifact@v2
