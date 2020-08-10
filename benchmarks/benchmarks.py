@@ -18,14 +18,13 @@ class TimeSuite:
     def time_hyperspy(self):
         self.execute('import hyperspy.api')
 
-    def time_hyperspy_api_nogui(self):
-        self.execute('import hyperspy.api_nogui')
+    #def time_hyperspy_api_nogui(self):
+    #    self.execute('import hyperspy.api_nogui')
     
-    def time_signal(self):
-        self.execute('from hyperspy._signals.signal1d import Signal1D')
+    #def time_signal(self):
+    #    self.execute('from hyperspy._signals.signal1d import Signal1D')
 
-class MemSuite:
-    def mem_list(self):
-        return [0] * 256
+# class MemSuite:
+#     def mem_list(self):
+#         return [0] * 256
 
-    
