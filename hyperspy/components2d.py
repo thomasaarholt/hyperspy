@@ -17,7 +17,7 @@
 # along with  HyperSpy.  If not, see <http://www.gnu.org/licenses/>.
 
 
-__doc__ = """
+__doc__ = """ 
 
 Components that can be used to define a 2D model for e.g. 2D model fitting.
 
