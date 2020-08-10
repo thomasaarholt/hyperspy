@@ -1,21 +1,27 @@
-# Automatically benchmark commits to Rnm and update the benchmark website
+# Automatically benchmark commits to Rnm and update the 
+# benchmark website. First generates results on various 
+# platforms. When finished, it generates the html from linux.
+
 # Performs the following actions:
+
+#   JOB 1 (multi OS)
 #   Checkout hyperspy-bench / gh-pages
 #   Upload previous results and config file to GH artifact
 #   Checkout RELEASE_next_minor
 #   Install python, hyperspy and asv
 #   Run latest commit
 #   Upload new result to GH artifact
-#   Download and merge previous results without overwriting
-#   Generate website and upload website to GH artifact
 #   Checkout hyperspy-bench/gh-pages
-#   Add results (overwriting old) and overwrite website
-#   Push changes
+#   Push results (overwriting old)
+
+#   JOB 2 (linux only)
+#   Same as above until Run
+#   Publish and upload html to artifact
+#   Checkout gh-pages
+#   Push html
 
 name: Bench Rnm-push to gh-pages
 
-# Controls when the action will run. Triggers the workflow on push or pull request
-# events but only for the master branch
 on:
   push:
     branches: [ master ] # Change to RELEASE_next_minor
@@ -86,15 +92,74 @@ jobs:
         name: asv_new_results
         path: results
 
-    - name: Download old results
+    - name: Checkout hyperspy-bench / gh-pages
+      uses: actions/checkout@v2
+      with:
+        repository: thomasaarholt/hyperspy-bench
+        ref: gh-pages
+        token: ${{ secrets.BENCHMARK_PAT }}
+
+    - name: Download new results
       uses: actions/download-artifact@v2
       with:
-        name: asv_old_results
-        path: old_results
-
-    - name: Merge old into new results (without overwriting)
+        name: asv_new_results
+        path: new_results
+      
+    - name: Copy over and push new results
       run: |
-        cp -vnpr old_results/* results/
+        cp -pr new_results/* results/
+
+        git config --global user.email "thomasaarholt@gmail.com"
+        git config --global user.name "Thomas Aarholt"
+
+        git add -u 
+        git push
+
+  Publish_Result: # Name of job
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout hyperspy-bench/gh-pages
+      uses: actions/checkout@v2
+      with:
+        repository: thomasaarholt/hyperspy-bench
+        ref: gh-pages
+        token: ${{ secrets.BENCHMARK_PAT }}
+
+    - name: Upload old results
+      uses: actions/upload-artifact@v2
+      with:
+        name: asv_results
+        path: results
+
+    - name: Upload configuration file
+      uses: actions/upload-artifact@v2
+      with:
+        name: asv_conf_json
+        path: asv.conf.json
+
+    - name: Checkout hyperspy
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: Setup Miniconda
+      uses: goanpeca/setup-miniconda@v1
+      with:
+        activate-environment: test_env
+        python-version: "3.8"
+
+    - name: Install ASV
+      run: |
+        pip install asv
+    
+    - name: Download ASV config
+      uses: actions/download-artifact@v2
+      with:
+        name: asv_conf_json
+
+    - name: Set ASV config
+      run: asv machine --machine publisher
 
     - name: Generate html
       run: asv publish
@@ -112,12 +177,6 @@ jobs:
         ref: gh-pages
         token: ${{ secrets.BENCHMARK_PAT }}
 
-    - name: Download new results (overwriting any duplicates)
-      uses: actions/download-artifact@v2
-      with:
-        name: asv_new_results
-        path: results
-
     - name: Download and overwrite html
       uses: actions/download-artifact@v2
       with:
@@ -125,7 +184,6 @@ jobs:
 
     - name: Push changes to gh-pages
       run: |
-        rm -rf old_results # Delete old results
         git config --global user.email "thomasaarholt@gmail.com"
         git config --global user.name "Thomas Aarholt"
         git add --all
