@@ -24,7 +24,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, windows-latest]
     steps:
     - name: Checkout hyperspy-bench/gh-pages
       uses: actions/checkout@v2
@@ -49,10 +49,8 @@ jobs:
       with:
         python-version: "3.8"
     
-    - name: Install HyperSpy and ASV
+    - name: Install ASV
       run: |
-        conda install pip
-        which pip
         pip install asv
     
     - name: Download ASV config
