@@ -22,8 +22,7 @@ env:
 # Controls when the action will run. Triggers the workflow on push or pull request
 # events but only for the master branch
 on:
-  pull_request:
-    branches: [ master ] # Change to RELEASE_next_minor
+  push:
     paths: '.github/workflows/test.yml' # Only trigger changing this file
 
 defaults:
