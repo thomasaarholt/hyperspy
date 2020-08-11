@@ -41,7 +41,7 @@ class BenchMultiFit:
         G = Gaussian(centre=50, sigma=10)
         x = np.arange(100)
         data = G.function(x)
-        nav = Signal2D(rg.random((600,))).T
+        nav = Signal1D(rg.random((600,))).T
         s = Signal1D(data) * nav
         m = s.create_model()
         m.append(G)

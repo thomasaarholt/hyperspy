@@ -68,8 +68,7 @@ jobs:
         BRANCH_COMMIT_ID=$(git rev-parse origin/master)
         echo $BRANCH_COMMIT_ID | tee -a commit_list.txt
         echo $GITHUB_SHA | tee -a commit_list.txt # Current commit
-        asv run HASHFILE:commit_list.txt --machine ${{ matrix.os }}
-        
+        asv run HASHFILE:commit_list.txt --machine ${{ matrix.os }} --show-stderr
 
     - name: Compare Benchmarks
       run: |
