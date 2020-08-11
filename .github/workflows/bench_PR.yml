@@ -62,12 +62,16 @@ jobs:
       run: |
         asv machine --machine ${{ matrix.os }}
 
-    - name: Run and Compare Benchmarks
+    - name: Run Benchmarks
       run: |
         # Get IDs of branch and PR commits
         BRANCH_COMMIT_ID=$(git rev-parse origin/master)
         echo $BRANCH_COMMIT_ID | tee -a commit_list.txt
         echo $GITHUB_SHA | tee -a commit_list.txt # Current commit
-
         asv run HASHFILE:commit_list.txt --machine ${{ matrix.os }}
+        
+
+    - name: Compare Benchmarks
+      run: |
+        BRANCH_COMMIT_ID=$(git rev-parse origin/master)
         asv compare $BRANCH_COMMIT_ID $GITHUB_SHA
