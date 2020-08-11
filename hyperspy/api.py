@@ -15,7 +15,8 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with  HyperSpy.  If not, see <http://www.gnu.org/licenses/>.
-
+from time import sleep
+sleep(3)
 from hyperspy.api_nogui import *
 import logging
 _logger = logging.getLogger(__name__)
