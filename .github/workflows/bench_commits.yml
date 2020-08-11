@@ -24,7 +24,8 @@ name: Benchmark Commits to Rnm
 
 on:
   push:
-    branches: [ master ] # Change to RELEASE_next_minor
+    branches: [ RELEASE_next_minor, RELEASE_next_patch, RELEASE_next_major ]
+    paths: '**.py' # Only trigger when changing python files
 
 defaults:
   run:

@@ -15,7 +15,7 @@ defaults:
 
 on:
   pull_request:
-    branches: [ master ] # Should become RELEASE_next_minor
+    branches: [ RELEASE_next_minor, RELEASE_next_patch, RELEASE_next_major ]
     types: [opened, synchronize, reopened]
     paths: '**.py' # Only trigger when changing python files
 

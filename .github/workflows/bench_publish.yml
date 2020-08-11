@@ -15,7 +15,7 @@ name: Publish Existing Benchmark Results
 # events but only for the master branch
 on:
   workflow_dispatch:
-    branches: [ master ] # Change to RELEASE_next_minor
+    branches: [ RELEASE_next_minor, RELEASE_next_patch, RELEASE_next_major ]
 
 defaults:
   run:
