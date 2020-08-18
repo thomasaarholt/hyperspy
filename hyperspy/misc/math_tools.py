@@ -207,3 +207,20 @@ def check_random_state(seed, lazy=False):
         return seed
 
     raise ValueError(f"{seed} cannot be used to seed a RandomState instance")
+
+def rotation_matrix_2d(angle):
+    "For an angle in degrees, calculate the 2x2 anti-clockwise rotation matrix"
+    angle = np.deg2rad(angle)
+    c, s = np.cos(angle), np.sin(angle)
+    return np.array(
+        [
+            [c, -s],
+            [s, c]]
+    )
+
+def rotate_scale(angle, ax1_scale, ax2_scale):
+    """For two axes scales, calculates the scales of the new
+    coordinate system after an anticlockwise rotation in degrees
+    """
+    ax1_new_scale, ax2_new_scale = np.abs(rotation_matrix_2d(angle) @ (ax1_scale, ax2_scale))
+    return ax1_new_scale, ax2_new_scale

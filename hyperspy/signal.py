@@ -62,7 +62,7 @@ from hyperspy.events import Events, Event
 from hyperspy.interactive import interactive
 from hyperspy.misc.signal_tools import (are_signals_aligned,
                                         broadcast_signals)
-from hyperspy.misc.math_tools import outer_nd, hann_window_nth_order, check_random_state
+from hyperspy.misc.math_tools import outer_nd, hann_window_nth_order, check_random_state, rotate_scale
 from hyperspy.exceptions import VisibleDeprecationWarning
 
 
@@ -5886,6 +5886,37 @@ class BaseSignal(FancySlicing,
         parameters as a property of a Signal.
         """
         return self.transpose()
+
+
+
+            
+    def rotate(self, angle, *args, **kwargs):
+        def rotate_axes_lengths(angle, length1, length2):
+            """Trig identities for calculating hyperspy
+            AxesManager `scale` after rotation
+            "abs" is necessary because hyperspy scales cannot be negative
+            """
+            import math
+            radangle = math.radians(angle)
+            cos = math.cos(radangle)
+            sin = math.sin(radangle)
+            return (
+                abs(length1*cos) + abs(length2*sin),
+                abs(length1*sin) + abs(length2*cos)
+            )
+
+        from scipy.ndimage.interpolation import rotate
+        ax0, ax1 = self.axes_manager.signal_axes
+        ax0_length = ax0.scale * ax0.size
+        ax1_length = ax1.scale * ax1.size
+
+        self.data = rotate(self.data, angle, reshape=True)
+        ax1.size, ax0.size = self.data.shape[-2:] # update sizes
+        self.axes_manager._update_attributes() # update AxM based on new sizes
+
+        ax0_length_new, ax1_length_new = rotate_axes_lengths(angle, ax0_length, ax1_length)
+        ax0.scale = ax0_length_new / ax0.size
+        ax1.scale = ax1_length_new / ax1.size
 
     def apply_apodization(self, window='hann',
                           hann_order=None, tukey_alpha=0.5, inplace=False):
