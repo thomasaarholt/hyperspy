@@ -530,3 +530,59 @@ at least when printing. As an example:
 In the background, HyperSpy also takes care of storing the data in memory in
 a "machine-friendly" way, so that iterating over the navigation axes is always
 fast.
+
+
+Iterating over the AxesManager
+------------------------------
+One can iterate over the AxesManager to produce indices to the navigation axes. Each iteration will yield a new tuple of indices, sorted according to the iteration path specified in :py:attr:`~.axes.AxesManager.iterpath`. Setting the :py:attr:`~.axes.AxesManager.indices` property to a new index will update the accompanying signal so that signal methods that operate at a specific navigation index will now use that index, like ``s.plot()``.
+
+.. code-block:: python
+
+    >>> s = hs.signals.Signal1D(np.zeros((2,3,10)))
+    >>> s.axes_manager.iterpath = 'flyback' # default until Hyperspy 2.0, then 'serpentine'
+    >>> for i in s.axes_manager:
+    ...     s.axes_manager.indices = i # s.plot() will change with this
+    ...     print(i)
+    (0, 0)
+    (1, 0)
+    (2, 0)
+    (0, 1)
+    (1, 1)
+    (2, 1)
+
+
+The ``AxesManager.iterpath`` specifies the strategy that the AxesManager should choose to iterate over the navigation axes. Two built-in strategies exist: ``'flyback'`` and ``'serpentine'``. The flyback strategy starts at (0,0), continues down the row until the final column, "flies back" to the first column, and continues from (1,0). The serpentine strategy begins the same way, but when it reaches the final column (of index N), it continues from (1, N) along the next row, in the same way that a snake might slither, left and right.
+
+.. code-block:: python
+
+    >>> s = hs.signals.Signal1D(np.zeros((2,3,10)))
+    >>> s.axes_manager.iterpath = 'serpentine'
+    >>> for i in s.axes_manager:
+    ...     print(i)
+
+The iterpath can also be set to be a specific list of indices, like [(0,0), (0,1)], but can also be any generator of indices. Storing a high-dimensional number of indices as a list of array can take a significant amount of storage space. By using a generator instead, one almost entirely removes such a memory footprint:
+
+.. code-block:: python
+
+    >>> s.axes_manager.iterpath = [(0,1), (1,1), (0,1)]
+    >>> for i in s.axes_manager:
+    ...     print(i)
+    (0, 1)
+    (1, 1)
+    (0, 1)
+
+    >>> def reverse_generator():
+    >>>     for i in range(2, -1, -1):
+    ...         for j in range(1, -1, -1):
+    ...             yield (i,j)
+
+    >>> s.axes_manager.iterpath = reverse_generator()
+    >>> for i in s.axes_manager:
+    ...     print(i)
+    (2, 1)
+    (2, 0)
+    (1, 1)
+    (1, 0)
+    (0, 1)
+    (0, 0)
+
