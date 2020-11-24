@@ -1020,7 +1020,6 @@ class AxesManager(t.HasTraits):
         self._axes.append(axis)
 
     def _on_index_changed(self):
-        self._update_attributes()
         self.events.indices_changed.trigger(obj=self)
 
     def _on_slice_changed(self):
