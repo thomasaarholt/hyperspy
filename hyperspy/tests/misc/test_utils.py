@@ -17,6 +17,7 @@
 # along with  HyperSpy.  If not, see <http://www.gnu.org/licenses/>.
 
 import numpy as np
+import pytest
 
 from hyperspy import signals
 from hyperspy.misc.utils import (
@@ -24,7 +25,18 @@ from hyperspy.misc.utils import (
     parse_quantity,
     slugify,
     strlist2enumeration,
+    is_cupy_array,
+    to_numpy,
+    get_array_module
 )
+
+try:
+    import cupy as cp
+    CUPY_INSTALLED = True
+except ImportError:
+    CUPY_INSTALLED = False
+
+skip_cupy = pytest.mark.skipif(not CUPY_INSTALLED, reason="cupy is required")
 
 
 def test_slugify():
@@ -65,3 +77,27 @@ def test_strlist2enumeration():
     assert strlist2enumeration(["a"]) == "a"
     assert strlist2enumeration(["a", "b"]) == "a and b"
     assert strlist2enumeration(["a", "b", "c"]) == "a, b and c"
+
+
+@skip_cupy
+def test_is_cupy_array():
+    cp_array = cp.array([0, 1, 2])
+    np_array = np.array([0, 1, 2])
+    assert is_cupy_array(cp_array)
+    assert not is_cupy_array(np_array)
+
+
+@skip_cupy
+def test_to_numpy():
+    cp_array = cp.array([0, 1, 2])
+    np_array = np.array([0, 1, 2])
+    np.testing.assert_allclose(to_numpy(cp_array), np_array)
+    np.testing.assert_allclose(to_numpy(np_array), np_array)
+
+
+@skip_cupy
+def test_get_array_module():
+    cp_array = cp.array([0, 1, 2])
+    np_array = np.array([0, 1, 2])
+    assert get_array_module(cp_array) == cp
+    assert get_array_module(np_array) == np
