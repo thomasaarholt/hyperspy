@@ -675,9 +675,9 @@ class EELSSpectrum_mixin:
         else:
             s = s.diff(-1)
         if tol is None:
-            tol = np.max(np.abs(s.data).min(axis.index_in_array))
+            tol = np.max(abs(s.data).min(axis.index_in_array))
         saxis = s.axes_manager[-1]
-        inflexion = (np.abs(s.data) <= tol).argmax(saxis.index_in_array)
+        inflexion = (abs(s.data) <= tol).argmax(saxis.index_in_array)
         if isinstance(inflexion, da.Array):
             inflexion = inflexion.compute()
         threshold.data[:] = saxis.index2value(inflexion)
