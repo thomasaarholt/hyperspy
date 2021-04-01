@@ -179,6 +179,8 @@ class TestDataAxis:
         np.testing.assert_almost_equal(axis.axis[0], 4)
         np.testing.assert_almost_equal(axis.axis[-1], 169)
 
+    def test_iterable_DataAxis(self):
+        assert ([a for a in self.axis.axis] == self.axis.axis).all()
 
 class TestFunctionalDataAxis:
 
@@ -227,6 +229,8 @@ class TestFunctionalDataAxis:
         with pytest.raises(AttributeError):
             self.axis.x
 
+    def test_iterable_FunctionalDataAxis(self):
+        assert ([a for a in self.axis.axis] == self.axis.axis).all()
 
 class TestReciprocalDataAxis:
 
@@ -529,6 +533,8 @@ class TestUniformDataAxis:
         with pytest.raises(ValueError):
             ax._parse_value("")
 
+    def test_iterable_UniformDataAxis(self):
+        assert ([a for a in self.axis.axis] == self.axis.axis).all()
 
 class TestUniformDataAxisValueRangeToIndicesNegativeScale:
 

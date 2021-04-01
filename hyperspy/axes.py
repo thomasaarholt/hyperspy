@@ -315,6 +315,9 @@ class BaseDataAxis(t.HasTraits):
         # change to correctly set its value.
         self._update_slice(self.navigate)
 
+    def __iter__(self):
+        return iter(self.axis)
+
     @property
     def is_uniform(self):
         return self._is_uniform

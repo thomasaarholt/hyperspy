@@ -325,7 +325,7 @@ Initializing ``x`` with ``offset`` and ``scale``:
 .. code-block:: python
 
     >>> from hyperspy.axes import UniformDataAxis
-    >>> dict0 = {'expression': 'a / x + b', 'a': 100, 'b': 10, 'x': UniformDataAxis(size=10,offset=10,scale=0.1)}
+    >>> dict0 = {'expression': 'a / x + b', 'a': 100, 'b': 10, 'x': UniformDataAxis(size=10, offset=10, scale=0.1)}
     >>> s = hs.signals.Signal1D(np.ones(500), axes=[dict0])
     >>> # the x array
     >>> s.axes_manager[0].x.axis
@@ -397,7 +397,7 @@ automatically determines the type of axis by the given attributes:
 .. code-block:: python
 
     >>> from hyperspy import axes
-    >>> axis = axes.create_axis(offset=10,scale=0.5,size=20)
+    >>> axis = axes.create_axis(offset=10, scale=0.5, size=20)
     >>> axis
     <Unnamed axis, size: 20>
     
@@ -407,7 +407,7 @@ directly:
 .. code-block:: python
 
     >>> from hyperspy import axes
-    >>> axis = axes.UniformDataAxis(offset=10,scale=0.5,size=20)
+    >>> axis = axes.UniformDataAxis(offset=10, scale=0.5, size=20)
     >>> axis
     <Unnamed axis, size: 20>
     
@@ -427,6 +427,23 @@ method:
 
 This dictionary can be used, for example, in the :ref:`initilization of a new
 signal<signal_initialization>`.
+
+Iterating over an axis
+----------------------
+
+All axes are iterable, and can be iterated over to produce a list of calibrated values:
+
+.. code-block:: python
+
+    >>> from hyperspy import axes
+    >>> axis = axes.UniformDataAxis(offset=10, scale=0.5, size=5)
+    >>> for index, value in enumerate(axis):
+    ...    print(index, value)
+    0 10.0
+    1 10.5
+    2 11.0
+    3 11.5
+    4 12.0
 
 
 Adding/Removing axes to/from a signal
@@ -455,7 +472,7 @@ or a list of axes objects:
 .. code-block:: python
 
     >>> from hyperspy.axes import UniformDataAxis, DataAxis
-    >>> axis0 = UniformDataAxis(offset=300,scale=1,size=500)
+    >>> axis0 = UniformDataAxis(offset=300, scale=1, size=500)
     >>> axis1 = DataAxis(axis=np.arange(12)**2)
     >>> s.axes_manager.create_axes([axis0,axis1])
 
