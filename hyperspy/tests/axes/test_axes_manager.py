@@ -24,6 +24,7 @@ from hyperspy.axes import AxesManager, _serpentine_iter, _flyback_iter, Generato
 from hyperspy.defaults_parser import preferences
 from hyperspy.signals import BaseSignal, Signal1D, Signal2D
 
+import numpy as np
 import pytest
 
 def generator():
@@ -497,3 +498,22 @@ def test_iterpath_function_serpentine():
     for i, indices in enumerate(_serpentine_iter((3,3,3))):
         if i == 3:
             assert indices == (2, 1, 0)
+
+class TestAxesManagerWrongAxesSize:
+    def setup_method(self, method):
+        self.data = np.zeros((5, 10))
+        ax1 = {'size' : 5}
+        ax2 = {'size' : 10}
+        ax3 = {'size' : 20}
+        self.axes = [ax1, ax2, ax3]
+
+    def test_axes_manager_wrong_number_of_axes(self):
+        with pytest.raises(ValueError, match="The number of axes"):
+            Signal1D(self.data, axes=self.axes)
+
+    def test_axes_manager_wrong_size_axes(self):
+        with pytest.raises(ValueError, match="The size of axes"):
+            Signal1D(self.data, axes=self.axes[1:])
+
+    def test_axes_manager_correct_axes(self):
+        Signal1D(self.data, axes=self.axes[:2])

@@ -2192,6 +2192,23 @@ class BaseSignal(FancySlicing,
                     obj: The signal that owns the data.
                 """, arguments=['obj'])
 
+    @property
+    def axes_manager(self):
+        return self._axes_manager
+
+    @axes_manager.setter
+    def axes_manager(self, am):
+        if len(am._axes) != len(self.data.shape):
+            raise ValueError(
+                (f'The number of axes ({len(am._axes)}) in the AxesManager does not match '
+                f'the number of dimensions in `signal.data` ({len(self.data.shape)}).')
+            )
+        for i, axis in enumerate(am._axes):
+            if axis.size != self.data.shape[axis.index_in_array]:
+                raise ValueError(f'The size of axes #{i} ({axis.size}) does not match the length of the signal array dimension {axis.index_in_array} ({self.data.shape[axis.index_in_array]}).')
+        self._axes_manager = am
+
+
     def _create_metadata(self):
         self.metadata = DictionaryTreeBrowser()
         mp = self.metadata
