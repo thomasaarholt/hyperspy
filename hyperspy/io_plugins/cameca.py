@@ -251,6 +251,8 @@ def im_reader(filename, *args, **kwds):
     # Not sure where to get the units from.
     # Assuming them to be in micrometer, as that is normally the case.
     units = 'um'
+    _logger.warn("Unable to parse the units. Assuming um.")
+
 
     # Z axis
     axes.append({
