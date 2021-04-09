@@ -56,10 +56,11 @@ def find_nanosims_masses_startingpoint(text):
 def nanosims_compounds(filename, header):
     """Returns info found in the im_chk file"""
     try:
-        f = open(filename.replace("im", "chk_im"))
+        chk_file = filename.replace("im", "chk_im")
+        f = open(chk_file)
     except FileNotFoundError:
-        print("File " + str(filename) + " not found.")
-        return ()
+        _logger.warn("No accompanying chk_im file found")
+        return {}
     text = f.read()
     (mass_start, lines) = find_nanosims_masses_startingpoint(text)
     species = []
@@ -241,19 +242,15 @@ def im_reader(filename, *args, **kwds):
     header, data = load_im_file(filename)
 
     chk_labels = nanosims_compounds(filename, header)
-
     header = {**header, **chk_labels}
 
     # Image mode
 
     axes = []
     array_shape = []
-    chk_exists = False
-    if chk_exists is True:
-        # set units based on that info
-        units = 'unitsfromchkfile'
-    else:
-        units = 'um'
+    # Not sure where to get the units from.
+    # Assuming them to be in micrometer, as that is normally the case.
+    units = 'um'
 
     # Z axis
     axes.append({
