@@ -263,7 +263,9 @@ class Model1D(BaseModel):
             self._on_navigating, [])
         self.channel_switches = np.array([True] * len(self.axis.axis))
         self.chisq = signal1D._get_navigation_signal()
-        self.chisq.change_dtype("float")
+        if not np.iscomplexobj(self.signal):
+            # chisq needs to be "not int"
+            self.chisq.change_dtype("float")
         self.chisq.data.fill(np.nan)
         self.chisq.metadata.General.title = (
             self.signal.metadata.General.title + ' chi-squared')
@@ -408,14 +410,14 @@ class Model1D(BaseModel):
 
         if self.convolved is False or non_convolved is True:
             axis = self.axis.axis[self.channel_switches]
-            sum_ = np.zeros(len(axis))
+            sum_ = np.zeros(len(axis), dtype=self.signal.data.dtype)
             for component in component_list:
                 sum_ += component.function(axis)
             to_return = sum_
 
         else:  # convolved
-            sum_convolved = np.zeros(len(self.convolution_axis))
-            sum_ = np.zeros(len(self.axis.axis))
+            sum_convolved = np.zeros(len(self.convolution_axis), dtype=self.signal.data.dtype)
+            sum_ = np.zeros(len(self.axis.axis), dtype=self.signal.data.dtype)
             for component in component_list:
                 if component.convolved:
                     sum_convolved += component.function(self.convolution_axis)
