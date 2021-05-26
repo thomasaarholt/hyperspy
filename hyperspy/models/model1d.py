@@ -395,6 +395,14 @@ class Model1D(BaseModel):
         -------
         numpy array
         """
+        # Need a flag for whether or not we are fitting on GPU
+        # for the moment, check if any Expression components have "cupy" in their whitelist
+        gpu = False
+        for comp in self:
+            if 'cupy' in comp._whitelist['module']:
+                gpu = True
+                import cupy as cp
+                break
 
         if component_list is None:
             component_list = self
@@ -408,7 +416,9 @@ class Model1D(BaseModel):
 
         if self.convolved is False or non_convolved is True:
             axis = self.axis.axis[self.channel_switches]
-            sum_ = np.zeros(len(axis))
+            if gpu:
+                axis = cp.asarray(axis)
+            sum_ = np.zeros_like(axis)
             for component in component_list:
                 sum_ += component.function(axis)
             to_return = sum_

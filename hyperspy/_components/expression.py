@@ -250,7 +250,6 @@ class Expression(Component):
         variables = [x, y] if self._is2D else [x]
         self._f = lambdify(variables + parameters, eval_expr,
                            modules=module, dummify=False)
-
         if self._is2D:
             def f(x, y): return self._f(
                 x, y, *[p.value for p in self.parameters])

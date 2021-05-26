@@ -659,6 +659,14 @@ class BaseModel(list):
                     self.p0 = (self.p0 + (parameter.value,)
                                if parameter._number_of_elements == 1
                                else self.p0 + parameter.value)
+        gpu = False
+        for comp in self:
+            if 'cupy' in comp._whitelist['module']:
+                gpu = True
+                import cupy as cp
+                break
+        if gpu:
+            self.p0 = cp.asarray(self.p0)
 
     def set_boundaries(self, bounded=True):
         warnings.warn(
