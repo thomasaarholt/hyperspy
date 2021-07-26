@@ -57,7 +57,7 @@ from hyperspy.misc.model_tools import current_model_values
 from hyperspy.misc.model_tools import (linear_regression, get_top_parent_twin,
                                        standard_error_from_covariance)
 from hyperspy.misc.slicing import copy_slice_from_whitelist
-from hyperspy.misc.utils import (dummy_context_manager, shorten_name, slugify,
+from hyperspy.misc.utils import (dummy_context_manager, is_binned, shorten_name, slugify,
                                  stash_active_state)
 from hyperspy.signal import BaseSignal
 from hyperspy.ui_registry import add_gui_method
@@ -1067,7 +1067,7 @@ class BaseModel(list):
 
         target_signal = self.signal()[np.where(self.channel_switches)]
 
-        if self.signal.metadata.Signal.binned is True:
+        if is_binned(self.signal):
             target_signal = target_signal / np.prod(
                 tuple((ax.scale for ax in self.signal.axes_manager.signal_axes))
             )

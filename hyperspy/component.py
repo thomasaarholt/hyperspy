@@ -1244,37 +1244,6 @@ class Component(t.HasTraits):
                 self, only_free=only_free))
 
 
-def _get_scaling_factor(signal, axis, parameter):
-    """
-    Convenience function to get the scaling factor required to take into
-    account binned and/or non-uniform axes.
-
-    Parameters
-    ----------
-    signal : BaseSignal
-    axis : BaseDataAxis
-    parameter : float or numpy array
-        The axis value at which scaling factor is evaluated (ignored if the axis
-        is uniform)
-
-    Returns
-    -------
-    scaling_factor
-
-    """
-
-    if is_binned(signal):
-    # in v2 replace by
-    #if axis.is_binned:
-        if axis.is_uniform:
-            scaling_factor = axis.scale
-        else:
-            parameter_idx  = axis.value2index(parameter)
-            scaling_factor = np.gradient(axis.axis)[parameter_idx]
-    else:
-        scaling_factor = 1
-
-    return scaling_factor
     @property
     def is_linear(self):
         """Loops through the components free parameters,
@@ -1338,3 +1307,36 @@ def _get_scaling_factor(signal, axis, parameter):
         convolved = np.convolve(sig, ll, mode="valid")
 
         return convolved
+
+
+def _get_scaling_factor(signal, axis, parameter):
+    """
+    Convenience function to get the scaling factor required to take into
+    account binned and/or non-uniform axes.
+
+    Parameters
+    ----------
+    signal : BaseSignal
+    axis : BaseDataAxis
+    parameter : float or numpy array
+        The axis value at which scaling factor is evaluated (ignored if the axis
+        is uniform)
+
+    Returns
+    -------
+    scaling_factor
+
+    """
+
+    if is_binned(signal):
+    # in v2 replace by
+    #if axis.is_binned:
+        if axis.is_uniform:
+            scaling_factor = axis.scale
+        else:
+            parameter_idx  = axis.value2index(parameter)
+            scaling_factor = np.gradient(axis.axis)[parameter_idx]
+    else:
+        scaling_factor = 1
+
+    return scaling_factor
