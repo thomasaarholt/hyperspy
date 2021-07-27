@@ -53,7 +53,7 @@ from hyperspy.misc.export_dictionary import (export_to_dictionary,
                                              load_from_dictionary,
                                              parse_flag_string,
                                              reconstruct_object)
-from hyperspy.misc.model_tools import current_model_values
+from hyperspy.misc.model_tools import current_model_values, all_set_non_free_para_have_identical_values
 from hyperspy.misc.model_tools import (linear_regression, get_top_parent_twin,
                                        standard_error_from_covariance)
 from hyperspy.misc.slicing import copy_slice_from_whitelist
@@ -921,9 +921,21 @@ class BaseModel(list):
                         linear.append(parameter)
         return linear
 
-    def _set_linear_parameters_to_one(self):
+    def unset_linear_parameters(self):
+        """Sets para.map['is_set'] attribute to False for all parameters.
+        This is used to reset parameters for fast linear fitting.
+
+        WARNING: This will remove the result of a previous fit!
+        """
+        for para in self.linear_parameters:
+            para.map['is_set'] = False
+
+    def _set_linear_parameters_to_one(self, precomputed=False):
         for parameter in self.linear_parameters:
-            parameter.value = 1
+            if precomputed:
+                parameter.map['values'] = 1
+            else:
+                parameter.value = 1
 
     def p0_index_from_component(self, component):
         "Get p0 index for components that have only one free parameter"
@@ -1007,18 +1019,32 @@ class BaseModel(list):
             self._component_data_fixed += component._compute_component()
 
     def calculate_covariance_matrix(self, target_signal):
-        """Calculate covariance matrix after having performed Linear Regression
-        """
+        '''Calculate covariance matrix after having performed Linear Regression
+        '''
         n = np.count_nonzero(self.channel_switches)  # the signal axis length
         k = self._component_data.shape[-2]  # the number of components
-
-        fit = self._component_data.T * self.coefficient_array
+        
+        if self._precomputed_components:
+            nav_shape = self.axes_manager._navigation_shape_in_array
+        else:
+            nav_shape = ()
+        fit = np.zeros(nav_shape + (n, k))
+        # Either component_data is the same across all nav, or not.
+        # Keep nav_shape for later updates to linear fitting
+        # For single pixels
+        for index in np.ndindex(nav_shape):
+            fit[index] = self._component_data.T * self.coefficient_array[index]
         res = target_signal - fit.sum(-1)  # The residual
-        res_dot = np.dot(res.T, res)
+        res_dot = np.zeros(nav_shape)
+        for index in np.ndindex(nav_shape):
+            res_dot[index] = np.dot(res[index].T, res[index])
 
         fit_dot = np.matmul(fit.swapaxes(-2, -1), fit)
         inv_fit_dot = np.linalg.inv(fit_dot)
-        covariance = (1 / (n - k)) * np.dot(res_dot, inv_fit_dot)
+        covariance = np.zeros(nav_shape + (k, k))
+        for index in np.ndindex(nav_shape):
+            covariance[index] = (1 / (n - k)) * \
+                np.dot(res_dot[index], inv_fit_dot[index])
         return covariance
 
     def _linear_fitting(self, algorithm="ridge_regression", **kwargs):
@@ -1030,42 +1056,56 @@ class BaseModel(list):
             'ridge_regression' - Default using sklearn
             'matrix_inversion' - Fallback, fragile
         """
-        if not self._precomputed_components:
-            not_linear_error = (
-                "Not all free parameters are linear. "
-                "Fit with a "
-                "different optimizer or set non-linear "
-                "`parameters.free = False`. These "
-                "parameters are nonlinear:"
+        not_linear_error = (
+            "Not all free parameters are linear. "
+            "Fit with a "
+            "different optimizer or set non-linear "
+            "`parameters.free = False`. These "
+            "parameters are nonlinear:"
+        )
+        nonlinear_parameters = self.nonlinear_parameters
+        if nonlinear_parameters:
+            raise AttributeError(
+                not_linear_error
+                + "\n\t"
+                + str("\n\t".join(str(para) for para in nonlinear_parameters))
             )
-            nonlinear_parameters = self.nonlinear_parameters
-            if nonlinear_parameters:
-                raise AttributeError(
-                    not_linear_error
-                    + "\n\t"
-                    + str("\n\t".join(str(para) for para in nonlinear_parameters))
-                )
-            if not self.linear_parameters:
-                raise AttributeError("There are no linear components in this model")
+        if not self.linear_parameters:
+            raise AttributeError("There are no linear components in this model")
 
-            self._set_linear_parameters_to_one()
-            self._set_p0()
-            n_free_para = len(self.free_parameters)
-            assert n_free_para > 0, "Model does not contain any free components!"
-            channels_signal_shape = np.count_nonzero(self.channel_switches)
+        #if not self._precomputed_components:
+        self._set_linear_parameters_to_one()
+        self._set_p0()
+        n_free_para = len(self.free_parameters)
+        assert n_free_para > 0, "Model does not contain any free components!"
+        channels_signal_shape = np.count_nonzero(self.channel_switches)
 
-            self._component_data = np.zeros((n_free_para, channels_signal_shape))
-            self._component_data_fixed = np.zeros(channels_signal_shape)
+        self._component_data = np.zeros((n_free_para, channels_signal_shape))
+        self._component_data_fixed = np.zeros(channels_signal_shape)
 
-            self._set_twinned_lists()
-            for component in self:
-                if component.active:
-                    self._append_component(component)
-        
-            if self._is_multifit:
-                self._precomputed_components = True
+        self._set_twinned_lists()
+        for component in self:
+            if component.active:
+                self._append_component(component)
 
-        target_signal = self.signal()[np.where(self.channel_switches)]
+        # if self._precomputed_components:
+        #     # TODO: Add ndimensional functionality for adding up components
+
+        #     # If the components have the same starting point (values) for all indices in the
+        #     # nav axes, then we can vectorize the calculation instead of looping
+        #     # slowly through the axes manager.
+
+        #     #nav_shape = self.axes_manager._navigation_shape_in_array
+        #     self._set_linear_parameters_to_one(precomputed=True)
+        #     self._component_data = np.zeros((n_free_para, channels_signal_shape))
+        #     self._component_data_fixed = np.zeros(nav_shape + channels_signal_shape)
+
+        if self._precomputed_components:
+            target_signal = self.signal.data.T[np.where(self.channel_switches.T)].T
+            nav_shape = self.axes_manager._navigation_shape_in_array
+        else:
+            target_signal = self.signal()[np.where(self.channel_switches)]
+            nav_shape = ()
 
         if is_binned(self.signal):
             target_signal = target_signal / np.prod(
@@ -1077,11 +1117,12 @@ class BaseModel(list):
         sig1Dshape = np.count_nonzero(self.channel_switches)
 
         # Reshape what may potentially be Signal2D data into a long Signal1D shape
-        target_signal = target_signal.reshape(sig1Dshape)        
+        target_signal = target_signal.reshape(nav_shape + (sig1Dshape,))
 
+        self.target_signal = target_signal
         if not import_sklearn.sklearn_installed or algorithm == "matrix_inversion":
             if algorithm != "matrix_inversion":
-                warnings.warn(
+                _logger.warning(
                     "Linear fitting is preferably done using the scikit-learn ridge regression code. "
                     "Install scikit-learn (sklearn) to use it. Proceding using a more fragile "
                     "matrix inversion approach."
@@ -1108,9 +1149,12 @@ class BaseModel(list):
                     algorithm
                 )
             )
+
+        #self.coefficient_array = self.coefficient_array.reshape(nav_shape + (len(self._component_data),))
+        
         covariance = self.calculate_covariance_matrix(target_signal)
         fit_output = {"success": True}
-        fit_output["x"] = self.p0 * self.coefficient_array
+        fit_output["x"] = self.coefficient_array
         fit_output["covar"] = covariance
         fit_output["perror"] = np.abs(fit_output["x"]) * standard_error_from_covariance(
             fit_output["covar"]
@@ -1629,8 +1673,18 @@ class BaseModel(list):
                 self._linear_algorithm = linear_algorithm # used for tests
                 fit_output = self._linear_fitting(algorithm=linear_algorithm, kwargs=kwargs)
                 self.fit_output = OptimizeResult(**fit_output)
-                self.p0 = self.fit_output.x
-                self.p_std = self.fit_output.perror
+
+                if self._precomputed_components:
+                    for i, para in enumerate(self.free_parameters):
+                        para.map['values'] = self.fit_output.x[..., i]
+                        para.map['std'] = self.fit_output.perror[...,i]
+                        para.map['is_set'] = True
+                    self.p0 = self.fit_output.x[self.axes_manager.indices]
+                    self.p_std = self.fit_output.perror[self.axes_manager.indices]
+
+                else:
+                    self.p0 = self.fit_output.x
+                    self.p_std = self.fit_output.perror
                 
             else:
                 # scipy.optimize.* functions
@@ -1684,6 +1738,7 @@ class BaseModel(list):
 
             self._fetch_values_from_p0(p_std=self.p_std)
             self.store_current_values()
+
             self._calculate_chisq()
             self._set_current_degrees_of_freedom()
 
@@ -1776,7 +1831,22 @@ class BaseModel(list):
         """
         self._is_multifit = True
         if ("optimizer", "linear") in kwargs.items():
-            self._precomputed_components = False # when True, reuse linear fitting components
+            para_are_identical, non_identical_para = all_set_non_free_para_have_identical_values(self)
+            if ("linear_algorithm", "matrix_inversion") in kwargs.items():
+                if para_are_identical:
+                    self._precomputed_components = True # when True, reuse linear fitting components
+                else:
+                    w = (
+                        "The model contains non-free parameters that have set "
+                        "values that vary across the navigation indices. Fitting "
+                        "proceeds using a slower approach than if all parameters "
+                        "had constant values. These parameters are:\n\t"
+                        + "\n\t".join(str(x) for x in non_identical_para))
+                    _logger.warning(w)
+                    self._precomputed_components = False
+            else:
+                # index by index linear fitting
+                self._precomputed_components = False
 
         if show_progressbar is None:
             show_progressbar = preferences.General.show_progressbar
@@ -1817,44 +1887,49 @@ class BaseModel(list):
         maxval = self.axes_manager._get_iterpath_size(masked_elements)
         show_progressbar = show_progressbar and (maxval != 0)
 
-        try:
-            i = 0
-            with self.axes_manager.events.indices_changed.suppress_callback(
-                self.fetch_stored_values
-            ):
-                if interactive_plot:
-                    outer = dummy_context_manager
-                    inner = self.suspend_update
-                else:
-                    outer = self.suspend_update
-                    inner = dummy_context_manager
+        if ("optimizer", "linear") in kwargs.items() and self._precomputed_components:
+            self.fit(**kwargs)
+            #self.fetch_stored_values()
 
-                with outer(update_on_resume=True):
-                    with progressbar(
-                        total=maxval, disable=not show_progressbar, leave=True
-                    ) as pbar:
-                        for index in self.axes_manager:
-                            with inner(update_on_resume=True):
-                                if mask is None or not mask[index[::-1]]:
-                                    # first check if model has set initial values in
-                                    # parameters.map['values'][indices],
-                                    # otherwise use values from previous fit
-                                    self.fetch_stored_values(only_fixed=fetch_only_fixed)
-                                    self.fit(**kwargs)
-                                    i += 1
-                                    pbar.update(1)
+        else:
+            try:
+                i = 0
+                with self.axes_manager.events.indices_changed.suppress_callback(
+                    self.fetch_stored_values
+                ):
+                    if interactive_plot:
+                        outer = dummy_context_manager
+                        inner = self.suspend_update
+                    else:
+                        outer = self.suspend_update
+                        inner = dummy_context_manager
 
-                                if autosave and i % autosave_every == 0:
-                                    self.save_parameters2file(autosave_fn)
-                # Trigger the indices_changed event to update to current indices,
-                # since the callback was suppressed
-                self.axes_manager.events.indices_changed.trigger(self.axes_manager)
-        except KeyboardInterrupt:
-            self._is_multifit = False
-            raise KeyboardInterrupt
-        except Exception as e:
-            self._is_multifit = False
-            raise e
+                    with outer(update_on_resume=True):
+                        with progressbar(
+                            total=maxval, disable=not show_progressbar, leave=True
+                        ) as pbar:
+                            for index in self.axes_manager:
+                                with inner(update_on_resume=True):
+                                    if mask is None or not mask[index[::-1]]:
+                                        # first check if model has set initial values in
+                                        # parameters.map['values'][indices],
+                                        # otherwise use values from previous fit
+                                        self.fetch_stored_values(only_fixed=fetch_only_fixed)
+                                        self.fit(**kwargs)
+                                        i += 1
+                                        pbar.update(1)
+
+                                    if autosave and i % autosave_every == 0:
+                                        self.save_parameters2file(autosave_fn)
+                    # Trigger the indices_changed event to update to current indices,
+                    # since the callback was suppressed
+                    self.axes_manager.events.indices_changed.trigger(self.axes_manager)
+            except KeyboardInterrupt:
+                self._is_multifit = False
+                raise KeyboardInterrupt
+            except Exception as e:
+                self._is_multifit = False
+                raise e
 
         if autosave is True:
             _logger.info(f"Deleting temporary file: {autosave_fn}.npz")

@@ -234,3 +234,43 @@ def get_top_parent_twin(parameter):
         return get_top_parent_twin(parameter.twin)
     else:
         return parameter
+
+def parameter_map_values_all_identical(para):
+    """Returns True if the parameter has identical values for all 
+    navigation indices, otherwise False.
+    """
+    return (para.map['values'] == para.map['values'].item(0)).all()
+
+def all_set_non_free_para_have_identical_values(model):
+    """Returns True and an empty list if the all parameters in the model that
+    are not free have identical values in their respective navigation
+    indices AND have `is_set` equal to True.
+    
+    Otherwise returns False and a list of the parameters with 
+    non-identical values.
+
+    This function is used with linear fitting to check whether to use the faster
+    method with precomputed components for the entire navigation space, or the slower
+    index-by-index fitting which supports parameters having fixed values that vary
+    from index to index.
+    """
+
+    non_identical_para = []
+    for comp in model:
+        if comp.active:
+            for para in comp.parameters:
+                if not para.free:
+                    if (~para.map['is_set']).all():
+                        is_identical = True
+                    else:
+                        if para.map['is_set'].all():
+                            if parameter_map_values_all_identical(para):
+                                is_identical = True
+                            else:
+                                is_identical = False
+                                non_identical_para.append(para)
+                        else:
+                            is_identical = False
+                            non_identical_para.append(para)
+
+    return is_identical, non_identical_para
