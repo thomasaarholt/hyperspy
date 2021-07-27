@@ -204,14 +204,10 @@ def linear_regression(y, component_data):
 
     """
     # Setting the following will be convenient for future dask/lazy support
-    matmul = np.matmul
-    inv = np.linalg.inv
-    dot = np.dot
-
-    square = matmul(component_data, component_data.T)
-    square_inv = inv(square)
-    component_data2 = matmul(square_inv, component_data)
-    fit_coefficients = dot(y, component_data2.T)
+    square = np.matmul(component_data, component_data.T)
+    square_inv = np.linalg.inv(square)
+    component_data2 = np.matmul(square_inv, component_data)
+    fit_coefficients = np.dot(y, component_data2.T)
     return fit_coefficients
 
 

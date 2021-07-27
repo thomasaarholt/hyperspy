@@ -1130,6 +1130,13 @@ class BaseModel(list):
             self.coefficient_array = linear_regression(
                 target_signal, self._component_data
             )
+            try:
+                from dask.diagnostics import ProgressBar
+                print('yup')
+                with ProgressBar():
+                    self.coefficient_array = self.coefficient_array.compute()
+            except:
+                pass
         elif algorithm == "ridge_regression":
             ridge_regression_solver = kwargs.pop("solver", "auto")
             ridge_regression_alpha = kwargs.pop("alpha", 0.0)
@@ -1152,14 +1159,16 @@ class BaseModel(list):
 
         #self.coefficient_array = self.coefficient_array.reshape(nav_shape + (len(self._component_data),))
         
-        covariance = self.calculate_covariance_matrix(target_signal)
         fit_output = {"success": True}
         fit_output["x"] = self.coefficient_array
-        fit_output["covar"] = covariance
-        fit_output["perror"] = np.abs(fit_output["x"]) * standard_error_from_covariance(
-            fit_output["covar"]
-        )
         fit_output["algorithm"] = algorithm
+
+        if not self._precomputed_components or ("calculate_errors", True) in kwargs.items():
+            covariance = self.calculate_covariance_matrix(target_signal)
+            fit_output["covar"] = covariance
+            fit_output["perror"] = np.abs(fit_output["x"]) * standard_error_from_covariance(
+                fit_output["covar"]
+            )
         return fit_output
 
     def _errfunc_sq(self, param, y, weights=None):
@@ -1674,13 +1683,15 @@ class BaseModel(list):
                 fit_output = self._linear_fitting(algorithm=linear_algorithm, kwargs=kwargs)
                 self.fit_output = OptimizeResult(**fit_output)
 
+                has_std = True if not self._precomputed_components or ("calculate_errors", True) in kwargs.items() else False
+
                 if self._precomputed_components:
                     for i, para in enumerate(self.free_parameters):
                         para.map['values'] = self.fit_output.x[..., i]
-                        para.map['std'] = self.fit_output.perror[...,i]
+                        para.map['std'] = self.fit_output.perror[...,i] if has_std else np.nan
                         para.map['is_set'] = True
                     self.p0 = self.fit_output.x[self.axes_manager.indices]
-                    self.p_std = self.fit_output.perror[self.axes_manager.indices]
+                    self.p_std = self.fit_output.perror[self.axes_manager.indices] if has_std else len(self.free_parameters) * (np.nan,)
 
                 else:
                     self.p0 = self.fit_output.x
