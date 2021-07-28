@@ -1149,7 +1149,7 @@ class BaseModel(list):
         except:
             pass
 
-        if ("calculate_errors", True) in kwargs.items():
+        if not self._precomputed_components or ("calculate_errors", True) in kwargs.items():
             if self._precomputed_components:
                 target_signal = target_signal.reshape(nav_shape + (sig1Dshape,))
             covariance = self.calculate_covariance_matrix(target_signal)
