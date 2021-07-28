@@ -39,7 +39,6 @@ from scipy.optimize import (
     minimize,
     OptimizeResult
 )
-
 from hyperspy.component import Component
 from hyperspy.defaults_parser import preferences
 from hyperspy.docstrings.model import FIT_PARAMETERS_ARG
@@ -48,7 +47,7 @@ from hyperspy.events import Event, Events, EventSuppressor
 from hyperspy.exceptions import VisibleDeprecationWarning
 from hyperspy.extensions import ALL_EXTENSIONS
 from hyperspy.external.mpfit.mpfit import mpfit
-from hyperspy.external.progressbar import progressbar
+from hyperspy.external.progressbar import progressbar, DaskProgressBar
 from hyperspy.misc.export_dictionary import (export_to_dictionary,
                                              load_from_dictionary,
                                              parse_flag_string,
@@ -62,7 +61,6 @@ from hyperspy.misc.utils import (dummy_context_manager, is_binned, shorten_name,
 from hyperspy.signal import BaseSignal
 from hyperspy.ui_registry import add_gui_method
 from hyperspy.misc.machine_learning import import_sklearn
-
 
 _logger = logging.getLogger(__name__)
 
@@ -901,41 +899,33 @@ class BaseModel(list):
 
     @property
     def nonlinear_parameters(self):
-        "List all free and active nonlinear parameters"
+        "List all active nonlinear parameters"
         nonlinear = []
         for comp in self:
             if comp.active:
-                for parameter in comp.parameters:
-                    if parameter.free and not parameter._is_linear:
-                        nonlinear.append(parameter)
+                for para in comp.parameters:
+                    if not para._is_linear:
+                        nonlinear.append(para)
         return nonlinear
 
     @property
     def linear_parameters(self):
-        "List all free and active linear parameters"
+        "List all active linear parameters"
         linear = []
         for comp in self:
             if comp.active:
-                for parameter in comp.parameters:
-                    if parameter.free and parameter._is_linear:
-                        linear.append(parameter)
+                for para in comp.parameters:
+                    if para._is_linear:
+                        linear.append(para)
         return linear
 
-    def unset_linear_parameters(self):
-        """Sets para.map['is_set'] attribute to False for all parameters.
-        This is used to reset parameters for fast linear fitting.
-
-        WARNING: This will remove the result of a previous fit!
-        """
-        for para in self.linear_parameters:
-            para.map['is_set'] = False
-
     def _set_linear_parameters_to_one(self, precomputed=False):
-        for parameter in self.linear_parameters:
-            if precomputed:
-                parameter.map['values'] = 1
-            else:
-                parameter.value = 1
+        for para in self.linear_parameters:
+            if para.free:
+                if precomputed:
+                    para.map['values'] = 1
+                else:
+                    para.value = 1
 
     def p0_index_from_component(self, component):
         "Get p0 index for components that have only one free parameter"
@@ -1028,20 +1018,21 @@ class BaseModel(list):
             nav_shape = self.axes_manager._navigation_shape_in_array
         else:
             nav_shape = ()
-        fit = np.zeros(nav_shape + (n, k))
+        fit = np.zeros(nav_shape + (n, k), like=target_signal)
         # Either component_data is the same across all nav, or not.
         # Keep nav_shape for later updates to linear fitting
         # For single pixels
         for index in np.ndindex(nav_shape):
             fit[index] = self._component_data.T * self.coefficient_array[index]
         res = target_signal - fit.sum(-1)  # The residual
-        res_dot = np.zeros(nav_shape)
+        res_dot = np.zeros(nav_shape, like=target_signal)
         for index in np.ndindex(nav_shape):
             res_dot[index] = np.dot(res[index].T, res[index])
 
         fit_dot = np.matmul(fit.swapaxes(-2, -1), fit)
         inv_fit_dot = np.linalg.inv(fit_dot)
-        covariance = np.zeros(nav_shape + (k, k))
+
+        covariance = np.zeros(nav_shape + (k, k), like=target_signal)
         for index in np.ndindex(nav_shape):
             covariance[index] = (1 / (n - k)) * \
                 np.dot(res_dot[index], inv_fit_dot[index])
@@ -1060,24 +1051,25 @@ class BaseModel(list):
             "Not all free parameters are linear. "
             "Fit with a "
             "different optimizer or set non-linear "
-            "`parameters.free = False`. These "
-            "parameters are nonlinear:"
+            "`parameters.free = False`. Consider using "
+            "`m.set_parameters_not_free(nonlinear=True)`. These "
+            "parameters are nonlinear and free:"
         )
-        nonlinear_parameters = self.nonlinear_parameters
-        if nonlinear_parameters:
+        free_nonlinear_parameters = [para for para in self.nonlinear_parameters if para.free]
+        if free_nonlinear_parameters:
             raise AttributeError(
                 not_linear_error
                 + "\n\t"
-                + str("\n\t".join(str(para) for para in nonlinear_parameters))
+                + str("\n\t".join(str(para) for para in free_nonlinear_parameters))
             )
         if not self.linear_parameters:
             raise AttributeError("There are no linear components in this model")
 
-        #if not self._precomputed_components:
         self._set_linear_parameters_to_one()
         self._set_p0()
         n_free_para = len(self.free_parameters)
-        assert n_free_para > 0, "Model does not contain any free components!"
+        if not n_free_para:
+            raise AttributeError("Model does not contain any free components!")
         channels_signal_shape = np.count_nonzero(self.channel_switches)
 
         self._component_data = np.zeros((n_free_para, channels_signal_shape))
@@ -1087,18 +1079,6 @@ class BaseModel(list):
         for component in self:
             if component.active:
                 self._append_component(component)
-
-        # if self._precomputed_components:
-        #     # TODO: Add ndimensional functionality for adding up components
-
-        #     # If the components have the same starting point (values) for all indices in the
-        #     # nav axes, then we can vectorize the calculation instead of looping
-        #     # slowly through the axes manager.
-
-        #     #nav_shape = self.axes_manager._navigation_shape_in_array
-        #     self._set_linear_parameters_to_one(precomputed=True)
-        #     self._component_data = np.zeros((n_free_para, channels_signal_shape))
-        #     self._component_data_fixed = np.zeros(nav_shape + channels_signal_shape)
 
         if self._precomputed_components:
             target_signal = self.signal.data.T[np.where(self.channel_switches.T)].T
@@ -1117,7 +1097,11 @@ class BaseModel(list):
         sig1Dshape = np.count_nonzero(self.channel_switches)
 
         # Reshape what may potentially be Signal2D data into a long Signal1D shape
-        target_signal = target_signal.reshape(nav_shape + (sig1Dshape,))
+        # and an nD navigation shape to a 1D nav shape
+        if self._precomputed_components:
+            target_signal = target_signal.reshape((np.prod(nav_shape, dtype=int), ) + (sig1Dshape,))
+        else:
+            target_signal = target_signal.reshape((sig1Dshape,))
 
         self.target_signal = target_signal
         if not import_sklearn.sklearn_installed or algorithm == "matrix_inversion":
@@ -1130,13 +1114,6 @@ class BaseModel(list):
             self.coefficient_array = linear_regression(
                 target_signal, self._component_data
             )
-            try:
-                from dask.diagnostics import ProgressBar
-                print('yup')
-                with ProgressBar():
-                    self.coefficient_array = self.coefficient_array.compute()
-            except:
-                pass
         elif algorithm == "ridge_regression":
             ridge_regression_solver = kwargs.pop("solver", "auto")
             ridge_regression_alpha = kwargs.pop("alpha", 0.0)
@@ -1146,7 +1123,7 @@ class BaseModel(list):
             )
             self.coefficient_array = ridge_regression(
                 X=self._component_data.T,
-                y=target_signal,
+                y=target_signal.T,
                 alpha=ridge_regression_alpha,
                 solver=ridge_regression_solver,
             )
@@ -1156,14 +1133,25 @@ class BaseModel(list):
                     algorithm
                 )
             )
-
+        if self._precomputed_components:
+            self.coefficient_array = self.coefficient_array.reshape(nav_shape + (len(self._component_data),))
+        
         #self.coefficient_array = self.coefficient_array.reshape(nav_shape + (len(self._component_data),))
         
         fit_output = {"success": True}
         fit_output["x"] = self.coefficient_array
         fit_output["algorithm"] = algorithm
+        try:
+            # Give a nice compute progressbar if data is a dask array
+            # Ridge Regression doesn't support 
+            with DaskProgressBar("Computing fit"):
+                fit_output["x"] = fit_output["x"].compute()
+        except:
+            pass
 
-        if not self._precomputed_components or ("calculate_errors", True) in kwargs.items():
+        if ("calculate_errors", True) in kwargs.items():
+            if self._precomputed_components:
+                target_signal = target_signal.reshape(nav_shape + (sig1Dshape,))
             covariance = self.calculate_covariance_matrix(target_signal)
             fit_output["covar"] = covariance
             fit_output["perror"] = np.abs(fit_output["x"]) * standard_error_from_covariance(
@@ -1680,7 +1668,7 @@ class BaseModel(list):
             elif optimizer == "linear":
                 linear_algorithm = kwargs.pop('linear_algorithm', 'ridge_regression')
                 self._linear_algorithm = linear_algorithm # used for tests
-                fit_output = self._linear_fitting(algorithm=linear_algorithm, kwargs=kwargs)
+                fit_output = self._linear_fitting(algorithm=linear_algorithm, **kwargs)
                 self.fit_output = OptimizeResult(**fit_output)
 
                 has_std = True if not self._precomputed_components or ("calculate_errors", True) in kwargs.items() else False
@@ -1690,8 +1678,14 @@ class BaseModel(list):
                         para.map['values'] = self.fit_output.x[..., i]
                         para.map['std'] = self.fit_output.perror[...,i] if has_std else np.nan
                         para.map['is_set'] = True
-                    self.p0 = self.fit_output.x[self.axes_manager.indices]
-                    self.p_std = self.fit_output.perror[self.axes_manager.indices] if has_std else len(self.free_parameters) * (np.nan,)
+                    self.p0 = self.fit_output.x[self.axes_manager.indices[::-1]]
+                    self.p_std = self.fit_output.perror[self.axes_manager.indices[::-1]] if has_std else len(self.free_parameters) * (np.nan,)
+
+                    # The nonlinear parameters' .map attribute doesn't get set during 
+                    # "all in one go" fitting with precomputed components:
+                    for para in self.nonlinear_parameters:
+                        para.map['values'] = para.value
+                        para.map['is_set'] = True
 
                 else:
                     self.p0 = self.fit_output.x
@@ -1843,21 +1837,21 @@ class BaseModel(list):
         self._is_multifit = True
         if ("optimizer", "linear") in kwargs.items():
             para_are_identical, non_identical_para = all_set_non_free_para_have_identical_values(self)
-            if ("linear_algorithm", "matrix_inversion") in kwargs.items():
-                if para_are_identical:
-                    self._precomputed_components = True # when True, reuse linear fitting components
-                else:
-                    w = (
-                        "The model contains non-free parameters that have set "
-                        "values that vary across the navigation indices. Fitting "
-                        "proceeds using a slower approach than if all parameters "
-                        "had constant values. These parameters are:\n\t"
-                        + "\n\t".join(str(x) for x in non_identical_para))
-                    _logger.warning(w)
-                    self._precomputed_components = False
+            # if ("linear_algorithm", "matrix_inversion") in kwargs.items():
+            if para_are_identical:
+                self._precomputed_components = True # when True, reuse linear fitting components
             else:
-                # index by index linear fitting
+                w = (
+                    "The model contains non-free parameters that have set "
+                    "values that vary across the navigation indices. Fitting "
+                    "proceeds using a slower approach than if all parameters "
+                    "had constant values. These parameters are:\n\t"
+                    + "\n\t".join(str(x) for x in non_identical_para))
+                _logger.warning(w)
                 self._precomputed_components = False
+            # else:
+            #     # index by index linear fitting
+            #     self._precomputed_components = False
 
         if show_progressbar is None:
             show_progressbar = preferences.General.show_progressbar
@@ -2141,7 +2135,7 @@ class BaseModel(list):
                 component_list=component_list))
 
     def set_parameters_not_free(self, component_list=None,
-                                parameter_name_list=None):
+                                parameter_name_list=None, only_linear=False, only_nonlinear=False):
         """
         Sets the parameters in a component in a model to not free.
 
@@ -2156,6 +2150,10 @@ class BaseModel(list):
             If None, will set all the parameters to not free.
             If list of strings, will set all the parameters with the same name
             as the strings in parameter_name_list to not free.
+        only_linear : bool
+            If True, will only set parameters that are linear to free.
+        only_nonlinear : bool
+            If True, will only set parameters that are nonlinear to free.
 
         Examples
         --------
@@ -2165,6 +2163,8 @@ class BaseModel(list):
 
         >>> m.set_parameters_not_free(component_list=[v1],
                                       parameter_name_list=['area','centre'])
+        >>> m.set_parameters_not_free(linear=True)
+
 
         See also
         --------
@@ -2181,10 +2181,10 @@ class BaseModel(list):
             component_list = [self._get_component(x) for x in component_list]
 
         for _component in component_list:
-            _component.set_parameters_not_free(parameter_name_list)
+            _component.set_parameters_not_free(parameter_name_list, only_linear=only_linear, only_nonlinear=only_nonlinear)
 
     def set_parameters_free(self, component_list=None,
-                            parameter_name_list=None):
+                            parameter_name_list=None, only_linear=False, only_nonlinear=False):
         """
         Sets the parameters in a component in a model to free.
 
@@ -2201,6 +2201,10 @@ class BaseModel(list):
             If list of strings, will set all the parameters with the same name
             as the strings in parameter_name_list to not free.
 
+        only_linear : Bool
+            If True, will only set parameters that are linear to not free.
+        only_nonlinear : Bool
+            If True, will only set parameters that are nonlinear to not free.
         Examples
         --------
         >>> v1 = hs.model.components1D.Voigt()
@@ -2208,6 +2212,7 @@ class BaseModel(list):
         >>> m.set_parameters_free()
         >>> m.set_parameters_free(component_list=[v1],
                                   parameter_name_list=['area','centre'])
+        >>> m.set_parameters_free(linear=True)
 
         See also
         --------
@@ -2224,7 +2229,7 @@ class BaseModel(list):
             component_list = [self._get_component(x) for x in component_list]
 
         for _component in component_list:
-            _component.set_parameters_free(parameter_name_list)
+            _component.set_parameters_free(parameter_name_list, only_linear=only_linear, only_nonlinear=only_nonlinear)
 
     def set_parameters_value(
             self,

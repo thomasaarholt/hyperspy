@@ -252,17 +252,14 @@ def all_set_non_free_para_have_identical_values(model):
     """
 
     non_identical_para = []
+    is_identical = True
     for comp in model:
         if comp.active:
             for para in comp.parameters:
                 if not para.free:
-                    if (~para.map['is_set']).all():
-                        is_identical = True
-                    else:
+                    if not (~para.map['is_set']).all():
                         if para.map['is_set'].all():
-                            if parameter_map_values_all_identical(para):
-                                is_identical = True
-                            else:
+                            if not parameter_map_values_all_identical(para):
                                 is_identical = False
                                 non_identical_para.append(para)
                         else:

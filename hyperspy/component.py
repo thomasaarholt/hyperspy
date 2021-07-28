@@ -1070,7 +1070,7 @@ class Component(t.HasTraits):
             self.fetch_stored_values()
         return s
 
-    def set_parameters_free(self, parameter_name_list=None):
+    def set_parameters_free(self, parameter_name_list=None, only_linear=False, only_nonlinear=False):
         """
         Sets parameters in a component to free.
 
@@ -1080,12 +1080,19 @@ class Component(t.HasTraits):
             If None, will set all the parameters to free.
             If list of strings, will set all the parameters with the same name
             as the strings in parameter_name_list to free.
+        only_linear : bool
+            If True, only sets a parameter free if it is linear
+        only_nonlinear : bool
+            If True, only sets a parameter free if it is nonlinear
+        
 
         Examples
         --------
         >>> v1 = hs.model.components1D.Voigt()
         >>> v1.set_parameters_free()
         >>> v1.set_parameters_free(parameter_name_list=['area','centre'])
+        >>> v1.set_parameters_free(linear=True)
+
 
         See also
         --------
@@ -1103,9 +1110,16 @@ class Component(t.HasTraits):
                     parameter_list.append(_parameter)
 
         for _parameter in parameter_list:
-            _parameter.free = True
+            if not only_linear and not only_nonlinear:
+                _parameter.free = True
+            elif only_linear and _parameter._is_linear:
+                _parameter.free = True
+            elif only_nonlinear and not _parameter._is_linear:
+                _parameter.free = True
+            else:
+                pass
 
-    def set_parameters_not_free(self, parameter_name_list=None):
+    def set_parameters_not_free(self, parameter_name_list=None, only_linear=False, only_nonlinear=False):
         """
         Sets parameters in a component to not free.
 
@@ -1115,12 +1129,17 @@ class Component(t.HasTraits):
             If None, will set all the parameters to not free.
             If list of strings, will set all the parameters with the same name
             as the strings in parameter_name_list to not free.
-
+        only_linear : bool
+            If True, only sets a parameter not free if it is linear
+        only_nonlinear : bool
+            If True, only sets a parameter not free if it is nonlinear
         Examples
         --------
         >>> v1 = hs.model.components1D.Voigt()
         >>> v1.set_parameters_not_free()
         >>> v1.set_parameters_not_free(parameter_name_list=['area','centre'])
+        >>> v1.set_parameters_not_free(only_linear=True)
+
 
         See also
         --------
@@ -1128,6 +1147,9 @@ class Component(t.HasTraits):
         hyperspy.model.BaseModel.set_parameters_free
         hyperspy.model.BaseModel.set_parameters_not_free
         """
+
+        if only_linear and only_nonlinear:
+            raise AttributeError("To set all parameters not free, set both only_linear and _nonlinear to False.")
 
         parameter_list = []
         if not parameter_name_list:
@@ -1138,7 +1160,14 @@ class Component(t.HasTraits):
                     parameter_list.append(_parameter)
 
         for _parameter in parameter_list:
-            _parameter.free = False
+            if not only_linear and not only_nonlinear:
+                _parameter.free = False
+            elif only_linear and _parameter._is_linear:
+                _parameter.free = False
+            elif only_nonlinear and not _parameter._is_linear:
+                _parameter.free = False
+            else:
+                pass
 
     def _estimate_parameters(self, signal):
         if self._axes_manager != signal.axes_manager:
