@@ -18,6 +18,7 @@
 
 from distutils.version import LooseVersion
 from tqdm import __version__ as tqdm_version
+from dask.callbacks import Callback
 
 if LooseVersion(tqdm_version) >= LooseVersion("4.36.0"):
     # API change for 5.0 https://github.com/tqdm/tqdm/pull/800
@@ -44,3 +45,23 @@ def progressbar(*args, **kwargs):
             pass
     return tqdm(*args, **kwargs)
 progressbar.__doc__ %= (tqdm.__doc__, tqdm.__init__.__doc__)
+
+class DaskProgressBar(Callback):
+    def __init__(self, desc=""):
+        """A progress bar for Dask that uses tqdm as a backend.
+
+        Parameters
+        ----------
+        desc : string
+            description of computation that is performed
+        """
+        self.desc = desc
+
+    def _start_state(self, dsk, state):
+        self._tqdm = progressbar(total=sum(len(state[k]) for k in ['ready', 'waiting', 'running', 'finished']), desc=self.desc)
+
+    def _posttask(self, key, result, dsk, state, worker_id):
+        self._tqdm.update(1)
+
+    def _finish(self, dsk, state, errored):
+        pass
