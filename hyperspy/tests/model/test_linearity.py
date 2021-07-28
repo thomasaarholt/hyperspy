@@ -44,7 +44,7 @@ class TestModelLinearity:
     def test_model_is_linear(self):
         self.g.sigma.free = False
         self.g.centre.free = False
-        assert not self.m.nonlinear_parameters
+        assert self.m.nonlinear_parameters
         assert self.m.linear_parameters
 
 def test_sympy_linear_expression():

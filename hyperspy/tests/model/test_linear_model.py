@@ -20,6 +20,7 @@ from hyperspy.datasets.artificial_data import get_low_loss_eels_signal
 from hyperspy.datasets.artificial_data import get_core_loss_eels_signal
 from hyperspy.misc.utils import slugify
 from hyperspy.decorators import lazifyTestClass
+from hyperspy.misc.model_tools import parameter_map_values_all_identical, all_set_non_free_para_have_identical_values
 
 class TestModelFitBinned:
 
@@ -29,7 +30,7 @@ class TestModelFitBinned:
             np.random.normal(
                 scale=2,
                 size=10000)).get_histogram()
-        s.metadata.Signal.binned = True
+        s.axes_manager[-1].binned = True
         g = Gaussian()
         m = s.create_model()
         m.append(g)
@@ -243,7 +244,7 @@ class TestLinearModel2D:
         P.d.value = 3
         P.e.value = 2
         
-        data = P.function(*self.mesh)# + G2.function(*mesh)
+        data = P.function(*self.mesh)
         s = Signal2D(data)
 
         m = s.create_model()
@@ -326,3 +327,39 @@ class TestCompute:
         self.lin.b.value = 3
         self.lin.b.free = False
         np.testing.assert_array_almost_equal(self.lin._compute_constant_term(), 3)
+
+
+class TestLinearModelTools:
+    def setup_method(self):
+        nav = Signal2D(np.random.random((2,2)))
+        s = EDS_SEM_Spectrum() * nav.T
+        self.m = s.create_model()
+
+    def test_parameter_map_values_all_identical(self):
+        para = self.m[0].a1
+        assert parameter_map_values_all_identical(para)
+        para.map['values'][0,0] = 2
+        assert not parameter_map_values_all_identical(para)
+
+
+    def test_all_set_non_free_para_have_identical_values(self):
+        assert all_set_non_free_para_have_identical_values(self.m)
+        
+        para1 = self.m[0].a1
+        para1.map['values'][0,0] = 2
+        is_identical, para_list =  all_set_non_free_para_have_identical_values(self.m)
+        assert is_identical is True
+        assert not para_list
+        
+        para1.free = False
+        is_identical, para_list =  all_set_non_free_para_have_identical_values(self.m)
+        assert is_identical is True
+        assert not para_list
+
+        para1.map['is_set'][0,0] = True
+        is_identical, para_list = all_set_non_free_para_have_identical_values(self.m)
+        assert is_identical is False
+        assert para1 in para_list and len(para_list) == 1
+
+
+    
