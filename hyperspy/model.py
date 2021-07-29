@@ -28,6 +28,7 @@ from functools import partial
 
 import dill
 import numpy as np
+import dask.array as da
 import scipy
 import scipy.odr as odr
 from IPython.display import display, display_pretty
@@ -236,7 +237,6 @@ class BaseModel(list):
             obj : Model
                 The Model that the event belongs to
             """, arguments=['obj'])
-        self._is_multifit = False
         self._precomputed_components = False
 
     def __hash__(self):
@@ -937,17 +937,17 @@ class BaseModel(list):
 
     def _set_twinned_lists(self):
         "Create lists of twinned components and their parents"
-        self.twinned_components_parents = []
-        self.twinned_components = []
-        self.twinned_parameters = []
+        self._twinned_components_parents = []
+        self._twinned_components = []
+        self._twinned_parameters = []
         for comp in self:
             for para in comp.parameters:
                 if para.twin and para._is_linear:
                     # Add only parameters that are both twinned and linear
-                    self.twinned_components.append(comp)
-                    self.twinned_parameters.append(para)
+                    self._twinned_components.append(comp)
+                    self._twinned_parameters.append(para)
                     parent = get_top_parent_twin(para)
-                    self.twinned_components_parents.append(parent.component)
+                    self._twinned_components_parents.append(parent.component)
 
     def _append_component(self, component):
         """
@@ -955,16 +955,16 @@ class BaseModel(list):
 
         The following code works for a component where ax+b/x+c can be
         multiple "pseudo" components, not only one"""
-        if component in self.twinned_components:
+        if component in self._twinned_components:
             # These twinned components have a linear parameter that is twinned
-            i = self.twinned_components.index(component)
+            i = self._twinned_components.index(component)
             component_constant_data = component._compute_constant_term()
 
-            parent_twin = self.twinned_components_parents[i]
+            parent_twin = self._twinned_components_parents[i]
             if parent_twin.free_parameters:
                 # component depends on some free component
                 top_parent_index = self.p0_index_from_component(
-                    self.twinned_components_parents[i]
+                    self._twinned_components_parents[i]
                 )
                 component_data = component._compute_component()
                 self._component_data[top_parent_index] += (
@@ -1008,34 +1008,35 @@ class BaseModel(list):
             # No free parameters, so component is fixed.
             self._component_data_fixed += component._compute_component()
 
-    def calculate_covariance_matrix(self, target_signal):
+    def calculate_covariance_matrix(self, target_signal, residual=None):
         '''Calculate covariance matrix after having performed Linear Regression
+
+        Parameters
+        ----------
+
+        target_signal : array-like, shape (N,) or (M, N)
+            The signal array to be fit to
+        residual : array-like, shape (0,) or (M,)
+            The residual sum of squares, optional
+
+        Notes
+        -----
+        See https://stats.stackexchange.com/questions/62470 for more info
         '''
+        fit = self.coefficient_array[..., None, :] * self._component_data.T[None]
+        if residual is None:
+            residual = ((target_signal - fit.sum(-1))**2).sum(-1)
+        fit_dot = np.matmul(fit.swapaxes(-2, -1), fit)
+        # Prefer to find another way than matrix inverse
+        if self.signal._lazy:
+            inv_fit_dot = da.asarray([np.linalg.inv(arr) for arr in fit_dot])
+        else:
+            inv_fit_dot = np.linalg.inv(fit_dot)
+
         n = np.count_nonzero(self.channel_switches)  # the signal axis length
         k = self._component_data.shape[-2]  # the number of components
-        
-        if self._precomputed_components:
-            nav_shape = self.axes_manager._navigation_shape_in_array
-        else:
-            nav_shape = ()
-        fit = np.zeros(nav_shape + (n, k), like=target_signal)
-        # Either component_data is the same across all nav, or not.
-        # Keep nav_shape for later updates to linear fitting
-        # For single pixels
-        for index in np.ndindex(nav_shape):
-            fit[index] = self._component_data.T * self.coefficient_array[index]
-        res = target_signal - fit.sum(-1)  # The residual
-        res_dot = np.zeros(nav_shape, like=target_signal)
-        for index in np.ndindex(nav_shape):
-            res_dot[index] = np.dot(res[index].T, res[index])
-
-        fit_dot = np.matmul(fit.swapaxes(-2, -1), fit)
-        inv_fit_dot = np.linalg.inv(fit_dot)
-
-        covariance = np.zeros(nav_shape + (k, k), like=target_signal)
-        for index in np.ndindex(nav_shape):
-            covariance[index] = (1 / (n - k)) * \
-                np.dot(res_dot[index], inv_fit_dot[index])
+        covariance = (1 / (n - k)) * (residual * inv_fit_dot.T).T
+        self.covariance = covariance
         return covariance
 
     def _linear_fitting(self, algorithm="ridge_regression", **kwargs):
@@ -1081,8 +1082,15 @@ class BaseModel(list):
                 self._append_component(component)
 
         if self._precomputed_components:
-            target_signal = self.signal.data.T[np.where(self.channel_switches.T)].T
             nav_shape = self.axes_manager._navigation_shape_in_array
+            if self.channel_switches.all():
+                # If channel_switches is all True, then is much more performant
+                # and less memory-intensive to just reshape the signal than use 
+                # fancy indexing (which would create a copy of the signal),
+                # especially with dask
+                target_signal = self.signal.data.reshape(nav_shape + (-1,))
+            else:
+                target_signal = self.signal.data.T[np.where(self.channel_switches.T)].T
         else:
             target_signal = self.signal()[np.where(self.channel_switches)]
             nav_shape = ()
@@ -1094,14 +1102,14 @@ class BaseModel(list):
 
         target_signal = target_signal - self._component_data_fixed
 
-        sig1Dshape = np.count_nonzero(self.channel_switches)
+        flat_sig_len = np.count_nonzero(self.channel_switches)
 
         # Reshape what may potentially be Signal2D data into a long Signal1D shape
         # and an nD navigation shape to a 1D nav shape
         if self._precomputed_components:
-            target_signal = target_signal.reshape((np.prod(nav_shape, dtype=int), ) + (sig1Dshape,))
+            target_signal = target_signal.reshape((np.prod(nav_shape, dtype=int), ) + (flat_sig_len,))
         else:
-            target_signal = target_signal.reshape((sig1Dshape,))
+            target_signal = target_signal.reshape((flat_sig_len,))
 
         self.target_signal = target_signal
         if not import_sklearn.sklearn_installed or algorithm == "matrix_inversion":
@@ -1114,7 +1122,25 @@ class BaseModel(list):
             self.coefficient_array = linear_regression(
                 target_signal, self._component_data
             )
+            residual = None
+        
+        elif algorithm == "lstsq" and not self.signal._lazy:
+            result, residual, *_ = np.linalg.lstsq(self._component_data.T, target_signal.T, rcond=None)
+            self.coefficient_array = result.T
+
+        elif algorithm == "lstsq" and self.signal._lazy:
+            result, residual, *_ = da.linalg.lstsq(da.asarray(self._component_data).T, target_signal.T)
+            self.coefficient_array = result.T
+
         elif algorithm == "ridge_regression":
+            if self.signal._lazy:
+                lazy_ridge_warning = (
+                    "You appear to be using the 'ridge_regression' fitting algorithm on a "
+                    "lazy signal. If the signal doesn't fit into memory, it may be much faster to "
+                    "use the 'matrix_inversion' algorithm, which is prone to Singular Matrix errors "
+                    "but supports lazy loading with Dask."
+                )
+                warnings.warn(lazy_ridge_warning)
             ridge_regression_solver = kwargs.pop("solver", "auto")
             ridge_regression_alpha = kwargs.pop("alpha", 0.0)
 
@@ -1127,36 +1153,47 @@ class BaseModel(list):
                 alpha=ridge_regression_alpha,
                 solver=ridge_regression_solver,
             )
+            residual = None
         else:
             raise ValueError(
-                "linear_algorithm {} not supported. Use 'ridge_regression' or 'matrix_inversion'.".format(
+                "linear_algorithm {} not supported. Use 'lstsq', 'ridge_regression' or 'matrix_inversion'.".format(
                     algorithm
                 )
             )
-        if self._precomputed_components:
-            self.coefficient_array = self.coefficient_array.reshape(nav_shape + (len(self._component_data),))
-        
-        #self.coefficient_array = self.coefficient_array.reshape(nav_shape + (len(self._component_data),))
-        
+
         fit_output = {"success": True}
         fit_output["x"] = self.coefficient_array
         fit_output["algorithm"] = algorithm
         try:
             # Give a nice compute progressbar if data is a dask array
-            # Ridge Regression doesn't support 
+            # Ridge Regression doesn't support dask for larger-than-memory :(
             with DaskProgressBar("Computing fit"):
                 fit_output["x"] = fit_output["x"].compute()
         except:
             pass
-
+        
+        # Calculate errors
+        # We only do this if going pixel-by-pixel, or if `calculate_errors = True` is specified
+        # to the fitter. This is because it is a very large calculation and can eat all our ram.
         if not self._precomputed_components or ("calculate_errors", True) in kwargs.items():
-            if self._precomputed_components:
-                target_signal = target_signal.reshape(nav_shape + (sig1Dshape,))
-            covariance = self.calculate_covariance_matrix(target_signal)
+            #if self._precomputed_components:
+                #target_signal = target_signal.reshape(nav_shape + (flat_sig_len,))
+            covariance = self.calculate_covariance_matrix(target_signal, residual=residual)
+            self.target_signal = target_signal
+            self.covariance = covariance
             fit_output["covar"] = covariance
-            fit_output["perror"] = np.abs(fit_output["x"]) * standard_error_from_covariance(
+            fit_output["perror"] = abs(fit_output["x"]) * standard_error_from_covariance(
                 fit_output["covar"]
             )
+        if self._precomputed_components:
+            # The nav shape will have been flattened. We reshape it here.
+            fit_output['x'] = fit_output['x'].reshape(nav_shape + (n_free_para,))
+
+            if ("calculate_errors", True) in kwargs.items():
+                fit_output['covar'] = fit_output['covar'].reshape(nav_shape + (n_free_para, n_free_para))
+                fit_output["perror"] = fit_output["perror"].reshape(nav_shape + (n_free_para,))
+
+        
         return fit_output
 
     def _errfunc_sq(self, param, y, weights=None):
@@ -1671,15 +1708,15 @@ class BaseModel(list):
                 fit_output = self._linear_fitting(algorithm=linear_algorithm, **kwargs)
                 self.fit_output = OptimizeResult(**fit_output)
 
-                has_std = True if not self._precomputed_components or ("calculate_errors", True) in kwargs.items() else False
+                has_errors = True if not self._precomputed_components or ("calculate_errors", True) in kwargs.items() else False
 
                 if self._precomputed_components:
                     for i, para in enumerate(self.free_parameters):
                         para.map['values'] = self.fit_output.x[..., i]
-                        para.map['std'] = self.fit_output.perror[...,i] if has_std else np.nan
+                        para.map['std'] = self.fit_output.perror[...,i] if has_errors else np.nan
                         para.map['is_set'] = True
                     self.p0 = self.fit_output.x[self.axes_manager.indices[::-1]]
-                    self.p_std = self.fit_output.perror[self.axes_manager.indices[::-1]] if has_std else len(self.free_parameters) * (np.nan,)
+                    self.p_std = self.fit_output.perror[self.axes_manager.indices[::-1]] if has_errors else len(self.free_parameters) * (np.nan,)
 
                     # The nonlinear parameters' .map attribute doesn't get set during 
                     # "all in one go" fitting with precomputed components:
@@ -1834,25 +1871,6 @@ class BaseModel(list):
         * :py:meth:`~hyperspy.model.BaseModel.fit`
 
         """
-        self._is_multifit = True
-        if ("optimizer", "linear") in kwargs.items():
-            para_are_identical, non_identical_para = all_set_non_free_para_have_identical_values(self)
-            # if ("linear_algorithm", "matrix_inversion") in kwargs.items():
-            if para_are_identical:
-                self._precomputed_components = True # when True, reuse linear fitting components
-            else:
-                w = (
-                    "The model contains non-free parameters that have set "
-                    "values that vary across the navigation indices. Fitting "
-                    "proceeds using a slower approach than if all parameters "
-                    "had constant values. These parameters are:\n\t"
-                    + "\n\t".join(str(x) for x in non_identical_para))
-                _logger.warning(w)
-                self._precomputed_components = False
-            # else:
-            #     # index by index linear fitting
-            #     self._precomputed_components = False
-
         if show_progressbar is None:
             show_progressbar = preferences.General.show_progressbar
 
@@ -1892,9 +1910,25 @@ class BaseModel(list):
         maxval = self.axes_manager._get_iterpath_size(masked_elements)
         show_progressbar = show_progressbar and (maxval != 0)
 
-        if ("optimizer", "linear") in kwargs.items() and self._precomputed_components:
+        if ("optimizer", "linear") in kwargs.items():
+            para_are_identical, non_identical_para = all_set_non_free_para_have_identical_values(self)
+            if para_are_identical:
+                self._precomputed_components = True # when True, reuse linear fitting components
+            else:
+                w = (
+                    "The model contains non-free parameters that have set "
+                    "values that vary across the navigation indices. Fitting "
+                    "proceeds using a slower approach than if all parameters "
+                    "had constant values. These parameters are:\n\t"
+                    + "\n\t".join(str(x) for x in non_identical_para))
+                _logger.warning(w)
+                self._precomputed_components = False
+        else:
+            self._precomputed_components = False
+
+        if self._precomputed_components:
+            # Perform linear fitting on entire dataset simultaneously
             self.fit(**kwargs)
-            #self.fetch_stored_values()
 
         else:
             try:
@@ -1929,12 +1963,7 @@ class BaseModel(list):
                     # Trigger the indices_changed event to update to current indices,
                     # since the callback was suppressed
                     self.axes_manager.events.indices_changed.trigger(self.axes_manager)
-            except KeyboardInterrupt:
-                self._is_multifit = False
-                raise KeyboardInterrupt
-            except Exception as e:
-                self._is_multifit = False
-                raise e
+
 
         if autosave is True:
             _logger.info(f"Deleting temporary file: {autosave_fn}.npz")
@@ -1942,7 +1971,6 @@ class BaseModel(list):
     
         if ("optimizer", "linear") in kwargs.items():
             self._precomputed_components = False
-        self._is_multifit = False
     
     multifit.__doc__ %= (SHOW_PROGRESSBAR_ARG)
 

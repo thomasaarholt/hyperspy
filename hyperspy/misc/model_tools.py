@@ -186,15 +186,16 @@ class current_model_values():
                         )._repr_html_()
         return html
 
-def linear_regression(y, component_data):
+
+def linear_regression(target_signal, component_data):
     """
     Performs linear regression by matrix inversion, solving the problem Ax = b
 
     Parameters
     ----------
-    y               : array_like, shape: (signal_axis) or (nav_shape, signal_axis)
+    target_signal   : array_like, shape: (signal_length) or (nav_shape, signal_length)
         The data to be fit to
-    component_data  : array_like, shape: (number_of_comp, signal_axis) or (nav_shape, number_of_comp, signal_axis)
+    component_data  : array_like, shape: (number_of_comp, signal_length)
         The components to fit to the data
 
     Returns:
@@ -203,25 +204,16 @@ def linear_regression(y, component_data):
                         shape: (number_of_comp) or (nav_shape, number_of_comp)
 
     """
-    # Setting the following will be convenient for future dask/lazy support
     square = np.matmul(component_data, component_data.T)
     square_inv = np.linalg.inv(square)
     component_data2 = np.matmul(square_inv, component_data)
-    fit_coefficients = np.dot(y, component_data2.T)
+    fit_coefficients = np.dot(target_signal, component_data2.T)
     return fit_coefficients
 
 
 def standard_error_from_covariance(covariance):
     "Get standard error coefficients from the diagonal of the covariance"
-    # dask diag only supports 2D arrays, so we cannot use diag (for now)
-    # if isinstance(data, da.Array):
-    #     sqrt = da.sqrt
-    #     diag = da.diag
-    # else:
-    #     sqrt = np.sqrt
-    #     diag = np.diag
-    standard_error = np.sqrt(np.diagonal(covariance, axis1=-2, axis2=-1))
-    return standard_error
+    return np.sqrt(np.diagonal(covariance, axis1=-2, axis2=-1))
 
 
 def get_top_parent_twin(parameter):
@@ -251,19 +243,21 @@ def all_set_non_free_para_have_identical_values(model):
     from index to index.
     """
 
+    model._set_twinned_lists()
     non_identical_para = []
     is_identical = True
     for comp in model:
         if comp.active:
             for para in comp.parameters:
                 if not para.free:
-                    if not (~para.map['is_set']).all():
-                        if para.map['is_set'].all():
-                            if not parameter_map_values_all_identical(para):
+                    if not para in model._twinned_parameters:
+                        if not (~para.map['is_set']).all():
+                            if para.map['is_set'].all():
+                                if not parameter_map_values_all_identical(para):
+                                    is_identical = False
+                                    non_identical_para.append(para)
+                            else:
                                 is_identical = False
                                 non_identical_para.append(para)
-                        else:
-                            is_identical = False
-                            non_identical_para.append(para)
 
     return is_identical, non_identical_para
