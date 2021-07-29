@@ -1285,10 +1285,12 @@ class Component(t.HasTraits):
 
     @property
     def linear_parameters(self):
+        "Get list of all linear parameters in component"
         return [para for para in self.free_parameters if para._is_linear]
 
     @property
     def nonlinear_parameters(self):
+        "Get list of all nonlinear parameters in component"
         return [para for para in self.free_parameters if not para._is_linear]
 
     @property

@@ -134,11 +134,17 @@ class TestFitAlgorithms:
         self.m.append(self.c)
 
     def test_compare_algorithms(self):
+        pytest.importorskip("sklearn")
         m = self.m
         m.fit(optimizer='linear', linear_algorithm='ridge_regression')
         assert m._linear_algorithm == 'ridge_regression'
 
         ridge_fit = m.as_signal()
+
+        m.fit(optimizer='linear', linear_algorithm='lstsq')
+        assert m._linear_algorithm == 'lstsq'
+        lstsq_fit = m.as_signal()
+        np.testing.assert_array_almost_equal(ridge_fit.data, lstsq_fit.data)
 
         m.fit(optimizer='linear', linear_algorithm='matrix_inversion')
         assert m._linear_algorithm == 'matrix_inversion'
