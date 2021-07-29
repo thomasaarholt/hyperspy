@@ -54,7 +54,7 @@ from hyperspy.misc.export_dictionary import (export_to_dictionary,
                                              parse_flag_string,
                                              reconstruct_object)
 from hyperspy.misc.model_tools import current_model_values, all_set_non_free_para_have_identical_values
-from hyperspy.misc.model_tools import (linear_regression, get_top_parent_twin,
+from hyperspy.misc.model_tools import (linear_regression_matrix_inversion, get_top_parent_twin,
                                        standard_error_from_covariance)
 from hyperspy.misc.slicing import copy_slice_from_whitelist
 from hyperspy.misc.utils import (dummy_context_manager, is_binned, shorten_name, slugify,
@@ -1008,7 +1008,7 @@ class BaseModel(list):
             # No free parameters, so component is fixed.
             self._component_data_fixed += component._compute_component()
 
-    def calculate_covariance_matrix(self, target_signal, residual=None):
+    def _calculate_covariance_matrix(self, target_signal, residual=None):
         '''Calculate covariance matrix after having performed Linear Regression
 
         Parameters
@@ -1023,10 +1023,14 @@ class BaseModel(list):
         -----
         See https://stats.stackexchange.com/questions/62470 for more info
         '''
-        fit = self.coefficient_array[..., None, :] * self._component_data.T[None]
+        if self._precomputed_components:
+            fit = self.coefficient_array[..., None, :] * self._component_data.T[None]
+        else:
+            fit = self.coefficient_array * self._component_data.T
         if residual is None:
             residual = ((target_signal - fit.sum(-1))**2).sum(-1)
         fit_dot = np.matmul(fit.swapaxes(-2, -1), fit)
+
         # Prefer to find another way than matrix inverse
         if self.signal._lazy:
             inv_fit_dot = da.asarray([np.linalg.inv(arr) for arr in fit_dot])
@@ -1036,17 +1040,17 @@ class BaseModel(list):
         n = np.count_nonzero(self.channel_switches)  # the signal axis length
         k = self._component_data.shape[-2]  # the number of components
         covariance = (1 / (n - k)) * (residual * inv_fit_dot.T).T
-        self.covariance = covariance
         return covariance
 
-    def _linear_fitting(self, algorithm="ridge_regression", **kwargs):
+    def _linear_fitting(self, algorithm="lstsq", **kwargs):
         """
         Multivariate linear fitting
 
         Parameters:
         algorithm: 
-            'ridge_regression' - Default using sklearn
-            'matrix_inversion' - Fallback, fragile
+            'lstsq' - Default, supports dask
+            'ridge_regression' - Supports regularisation, not dask
+            'matrix_inversion' - Fallback, prone to singular matrix error, supports dask
         """
         not_linear_error = (
             "Not all free parameters are linear. "
@@ -1111,20 +1115,7 @@ class BaseModel(list):
         else:
             target_signal = target_signal.reshape((flat_sig_len,))
 
-        self.target_signal = target_signal
-        if not import_sklearn.sklearn_installed or algorithm == "matrix_inversion":
-            if algorithm != "matrix_inversion":
-                _logger.warning(
-                    "Linear fitting is preferably done using the scikit-learn ridge regression code. "
-                    "Install scikit-learn (sklearn) to use it. Proceding using a more fragile "
-                    "matrix inversion approach."
-                )
-            self.coefficient_array = linear_regression(
-                target_signal, self._component_data
-            )
-            residual = None
-        
-        elif algorithm == "lstsq" and not self.signal._lazy:
+        if algorithm == "lstsq" and not self.signal._lazy:
             result, residual, *_ = np.linalg.lstsq(self._component_data.T, target_signal.T, rcond=None)
             self.coefficient_array = result.T
 
@@ -1132,13 +1123,18 @@ class BaseModel(list):
             result, residual, *_ = da.linalg.lstsq(da.asarray(self._component_data).T, target_signal.T)
             self.coefficient_array = result.T
 
+        elif algorithm == "matrix_inversion":
+            self.coefficient_array = linear_regression_matrix_inversion(
+                target_signal, self._component_data
+            )
+            residual = None
+
         elif algorithm == "ridge_regression":
             if self.signal._lazy:
                 lazy_ridge_warning = (
                     "You appear to be using the 'ridge_regression' fitting algorithm on a "
                     "lazy signal. If the signal doesn't fit into memory, it may be much faster to "
-                    "use the 'matrix_inversion' algorithm, which is prone to Singular Matrix errors "
-                    "but supports lazy loading with Dask."
+                    "use the lstsq algorithm, as ridge does not support lazy loading with Dask."
                 )
                 warnings.warn(lazy_ridge_warning)
             ridge_regression_solver = kwargs.pop("solver", "auto")
@@ -1173,18 +1169,15 @@ class BaseModel(list):
             pass
         
         # Calculate errors
-        # We only do this if going pixel-by-pixel, or if `calculate_errors = True` is specified
-        # to the fitter. This is because it is a very large calculation and can eat all our ram.
+        # We only do this if going pixel-by-pixel or if `calculate_errors = True` is specified
+        # to multifit. This is because it is a very large calculation and can eat all our ram,
+        # even when run lazily.
         if not self._precomputed_components or ("calculate_errors", True) in kwargs.items():
-            #if self._precomputed_components:
-                #target_signal = target_signal.reshape(nav_shape + (flat_sig_len,))
-            covariance = self.calculate_covariance_matrix(target_signal, residual=residual)
-            self.target_signal = target_signal
-            self.covariance = covariance
-            fit_output["covar"] = covariance
+            fit_output["covar"] = self._calculate_covariance_matrix(target_signal, residual=residual)
             fit_output["perror"] = abs(fit_output["x"]) * standard_error_from_covariance(
                 fit_output["covar"]
             )
+
         if self._precomputed_components:
             # The nav shape will have been flattened. We reshape it here.
             fit_output['x'] = fit_output['x'].reshape(nav_shape + (n_free_para,))
@@ -1192,7 +1185,11 @@ class BaseModel(list):
             if ("calculate_errors", True) in kwargs.items():
                 fit_output['covar'] = fit_output['covar'].reshape(nav_shape + (n_free_para, n_free_para))
                 fit_output["perror"] = fit_output["perror"].reshape(nav_shape + (n_free_para,))
-
+            try:
+                with DaskProgressBar("Computing errors"):
+                    fit_output["perror"] = fit_output["perror"].compute()
+            except:
+                pass
         
         return fit_output
 
@@ -1703,7 +1700,7 @@ class BaseModel(list):
                 self.p_std = self.fit_output.perror
 
             elif optimizer == "linear":
-                linear_algorithm = kwargs.pop('linear_algorithm', 'ridge_regression')
+                linear_algorithm = kwargs.pop('linear_algorithm', 'lstsq')
                 self._linear_algorithm = linear_algorithm # used for tests
                 fit_output = self._linear_fitting(algorithm=linear_algorithm, **kwargs)
                 self.fit_output = OptimizeResult(**fit_output)
@@ -1927,50 +1924,49 @@ class BaseModel(list):
             self._precomputed_components = False
 
         if self._precomputed_components:
-            # Perform linear fitting on entire dataset simultaneously
-            self.fit(**kwargs)
+            # Perform linear fitting on entire dataset simultaneously,
+            # not iterating through the axes manager
+            try:
+                self.fit(**kwargs)
+            finally:
+                self._precomputed_components = False
 
         else:
-            try:
-                i = 0
-                with self.axes_manager.events.indices_changed.suppress_callback(
-                    self.fetch_stored_values
-                ):
-                    if interactive_plot:
-                        outer = dummy_context_manager
-                        inner = self.suspend_update
-                    else:
-                        outer = self.suspend_update
-                        inner = dummy_context_manager
+            i = 0
+            with self.axes_manager.events.indices_changed.suppress_callback(
+                self.fetch_stored_values
+            ):
+                if interactive_plot:
+                    outer = dummy_context_manager
+                    inner = self.suspend_update
+                else:
+                    outer = self.suspend_update
+                    inner = dummy_context_manager
 
-                    with outer(update_on_resume=True):
-                        with progressbar(
-                            total=maxval, disable=not show_progressbar, leave=True
-                        ) as pbar:
-                            for index in self.axes_manager:
-                                with inner(update_on_resume=True):
-                                    if mask is None or not mask[index[::-1]]:
-                                        # first check if model has set initial values in
-                                        # parameters.map['values'][indices],
-                                        # otherwise use values from previous fit
-                                        self.fetch_stored_values(only_fixed=fetch_only_fixed)
-                                        self.fit(**kwargs)
-                                        i += 1
-                                        pbar.update(1)
+                with outer(update_on_resume=True):
+                    with progressbar(
+                        total=maxval, disable=not show_progressbar, leave=True
+                    ) as pbar:
+                        for index in self.axes_manager:
+                            with inner(update_on_resume=True):
+                                if mask is None or not mask[index[::-1]]:
+                                    # first check if model has set initial values in
+                                    # parameters.map['values'][indices],
+                                    # otherwise use values from previous fit
+                                    self.fetch_stored_values(only_fixed=fetch_only_fixed)
+                                    self.fit(**kwargs)
+                                    i += 1
+                                    pbar.update(1)
 
-                                    if autosave and i % autosave_every == 0:
-                                        self.save_parameters2file(autosave_fn)
-                    # Trigger the indices_changed event to update to current indices,
-                    # since the callback was suppressed
-                    self.axes_manager.events.indices_changed.trigger(self.axes_manager)
-
+                                if autosave and i % autosave_every == 0:
+                                    self.save_parameters2file(autosave_fn)
+                # Trigger the indices_changed event to update to current indices,
+                # since the callback was suppressed
+                self.axes_manager.events.indices_changed.trigger(self.axes_manager)
 
         if autosave is True:
             _logger.info(f"Deleting temporary file: {autosave_fn}.npz")
             os.remove(autosave_fn + ".npz")
-    
-        if ("optimizer", "linear") in kwargs.items():
-            self._precomputed_components = False
     
     multifit.__doc__ %= (SHOW_PROGRESSBAR_ARG)
 

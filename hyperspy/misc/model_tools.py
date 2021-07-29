@@ -186,8 +186,7 @@ class current_model_values():
                         )._repr_html_()
         return html
 
-
-def linear_regression(target_signal, component_data):
+def linear_regression_matrix_inversion(target_signal, component_data):
     """
     Performs linear regression by matrix inversion, solving the problem Ax = b
 
@@ -210,11 +209,9 @@ def linear_regression(target_signal, component_data):
     fit_coefficients = np.dot(target_signal, component_data2.T)
     return fit_coefficients
 
-
 def standard_error_from_covariance(covariance):
     "Get standard error coefficients from the diagonal of the covariance"
     return np.sqrt(np.diagonal(covariance, axis1=-2, axis2=-1))
-
 
 def get_top_parent_twin(parameter):
     "Get the top parent twin, if there is one"

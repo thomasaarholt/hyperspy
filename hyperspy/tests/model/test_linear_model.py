@@ -18,6 +18,7 @@ from hyperspy.components2d import Gaussian2D
 from hyperspy.datasets.example_signals import EDS_SEM_Spectrum
 from hyperspy.datasets.artificial_data import get_low_loss_eels_signal
 from hyperspy.datasets.artificial_data import get_core_loss_eels_signal
+from hyperspy.misc.model_tools import get_top_parent_twin
 from hyperspy.misc.utils import slugify
 from hyperspy.decorators import lazifyTestClass
 from hyperspy.misc.model_tools import parameter_map_values_all_identical, all_set_non_free_para_have_identical_values
@@ -279,6 +280,13 @@ class TestLinearFitTwins:
         m.extend(gs)
         self.s, self.m, self.gs = s, m, gs
 
+    def test_get_parent_twin(self):
+        assert get_top_parent_twin(self.gs[2].A) is self.gs[0].A
+        assert get_top_parent_twin(self.gs[1].A) is self.gs[0].A
+        assert get_top_parent_twin(self.gs[0].A) is self.gs[0].A
+
+
+
     def test_without_twins(self):
         for g in self.gs:
             g.sigma.free = False
@@ -360,6 +368,3 @@ class TestLinearModelTools:
         is_identical, para_list = all_set_non_free_para_have_identical_values(self.m)
         assert is_identical is False
         assert para1 in para_list and len(para_list) == 1
-
-
-    
