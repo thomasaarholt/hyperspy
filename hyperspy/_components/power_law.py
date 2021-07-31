@@ -87,8 +87,6 @@ class PowerLaw(Expression):
         self.isbackground = True
         self.convolved = False
 
-        self.A._is_linear_override = True
-
     def estimate_parameters(self, signal, x1, x2, only_current=False,
                             out=False):
         """Estimate the parameters for the power law component by the two area
