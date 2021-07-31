@@ -1032,7 +1032,9 @@ class BaseModel(list):
         fit_dot = np.matmul(fit.swapaxes(-2, -1), fit)
 
         # Prefer to find another way than matrix inverse
-        if self.signal._lazy:
+        # if target_signal shape is 1D, then fit_dot is 2D and numpy going to dask.linalg.inv is fine.
+        # If target_signal shape is 2D, then dask.linalg.inv will fail because fit_dot is 3D.
+        if self.signal._lazy and len(target_signal.shape) != 1: 
             inv_fit_dot = da.asarray([np.linalg.inv(arr) for arr in fit_dot])
         else:
             inv_fit_dot = np.linalg.inv(fit_dot)
@@ -1042,16 +1044,30 @@ class BaseModel(list):
         covariance = (1 / (n - k)) * (residual * inv_fit_dot.T).T
         return covariance
 
-    def _linear_fitting(self, algorithm="lstsq", **kwargs):
+    def _linear_fitting(self, optimizer="lstsq", **kwargs):
         """
         Multivariate linear fitting
 
-        Parameters:
-        algorithm: 
+        Parameters
+        __________
+
+        optimizer: 
             'lstsq' - Default, supports dask
             'ridge_regression' - Supports regularisation, not dask
             'matrix_inversion' - Fallback, prone to singular matrix error, supports dask
+
+        Developer Notes
+        ---------------
+        More linear optimizers can be added in future, but note that in order to support simultaneous
+        fitting across the dataset, the optimizer must support "two-dimensional y" (see the 
+        `b` parameter in numpy.linalg.lstsq).
+
+        Currently, the overhead in calculating the component data takes about 100 times longer than
+        actually running np.linalg.lstsq. That means that going pixel-by-pixel, calculating the 
+        component data each time is not faster than the normal nonlinear methods. Linear fitting
+        is hence currently only useful for fitting a dataset in the vectorised manner.
         """
+
         not_linear_error = (
             "Not all free parameters are linear. "
             "Fit with a "
@@ -1115,28 +1131,29 @@ class BaseModel(list):
         else:
             target_signal = target_signal.reshape((flat_sig_len,))
 
-        if algorithm == "lstsq" and not self.signal._lazy:
+        if optimizer == "lstsq" and not self.signal._lazy:
             result, residual, *_ = np.linalg.lstsq(self._component_data.T, target_signal.T, rcond=None)
             self.coefficient_array = result.T
 
-        elif algorithm == "lstsq" and self.signal._lazy:
+        elif optimizer == "lstsq" and self.signal._lazy:
             result, residual, *_ = da.linalg.lstsq(da.asarray(self._component_data).T, target_signal.T)
             self.coefficient_array = result.T
 
-        elif algorithm == "matrix_inversion":
+        elif optimizer == "matrix_inversion":
             self.coefficient_array = linear_regression_matrix_inversion(
                 target_signal, self._component_data
             )
             residual = None
 
-        elif algorithm == "ridge_regression":
+        elif optimizer == "ridge_regression":
             if self.signal._lazy:
                 lazy_ridge_warning = (
-                    "You appear to be using the 'ridge_regression' fitting algorithm on a "
+                    "You appear to be using the 'ridge_regression' optimizer on a "
                     "lazy signal. If the signal doesn't fit into memory, it may be much faster to "
-                    "use the lstsq algorithm, as ridge does not support lazy loading with Dask."
+                    "use the 'lstsq' optimizer, as ridge does not support lazy loading with Dask."
                 )
                 warnings.warn(lazy_ridge_warning)
+
             ridge_regression_solver = kwargs.pop("solver", "auto")
             ridge_regression_alpha = kwargs.pop("alpha", 0.0)
 
@@ -1152,18 +1169,17 @@ class BaseModel(list):
             residual = None
         else:
             raise ValueError(
-                "linear_algorithm {} not supported. Use 'lstsq', 'ridge_regression' or 'matrix_inversion'.".format(
-                    algorithm
+                "Optimizer {} not supported. Use 'lstsq', 'ridge_regression' or 'matrix_inversion'.".format(
+                    optimizer
                 )
             )
 
         fit_output = {"success": True}
         fit_output["x"] = self.coefficient_array
-        fit_output["algorithm"] = algorithm
         try:
             # Give a nice compute progressbar if data is a dask array
             # Ridge Regression doesn't support dask for larger-than-memory :(
-            with DaskProgressBar("Computing fit"):
+            with DaskProgressBar("Computing fit lazily"):
                 fit_output["x"] = fit_output["x"].compute()
         except:
             pass
@@ -1186,7 +1202,7 @@ class BaseModel(list):
                 fit_output['covar'] = fit_output['covar'].reshape(nav_shape + (n_free_para, n_free_para))
                 fit_output["perror"] = fit_output["perror"].reshape(nav_shape + (n_free_para,))
             try:
-                with DaskProgressBar("Computing errors"):
+                with DaskProgressBar("Computing errors lazily"):
                     fit_output["perror"] = fit_output["perror"].compute()
             except:
                 pass
@@ -1699,12 +1715,11 @@ class BaseModel(list):
                 self.p0 = self.fit_output.x
                 self.p_std = self.fit_output.perror
 
-            elif optimizer == "linear":
-                linear_algorithm = kwargs.pop('linear_algorithm', 'lstsq')
-                self._linear_algorithm = linear_algorithm # used for tests
-                fit_output = self._linear_fitting(algorithm=linear_algorithm, **kwargs)
+            elif optimizer in ["lstsq", "ridge_regression", "matrix_inversion"]:
+                fit_output = self._linear_fitting(optimizer=optimizer, **kwargs)
                 self.fit_output = OptimizeResult(**fit_output)
 
+                # Only calculated errors if fit pixel by pixel, or specified m.fit(calculate_errors=True)
                 has_errors = True if not self._precomputed_components or ("calculate_errors", True) in kwargs.items() else False
 
                 if self._precomputed_components:
@@ -1907,7 +1922,7 @@ class BaseModel(list):
         maxval = self.axes_manager._get_iterpath_size(masked_elements)
         show_progressbar = show_progressbar and (maxval != 0)
 
-        if ("optimizer", "linear") in kwargs.items():
+        if "optimizer" in kwargs.keys() and kwargs['optimizer'] in ["lstsq", "ridge_regression", "matrix_inversion"]:
             para_are_identical, non_identical_para = all_set_non_free_para_have_identical_values(self)
             if para_are_identical:
                 self._precomputed_components = True # when True, reuse linear fitting components

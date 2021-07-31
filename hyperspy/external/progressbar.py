@@ -48,12 +48,17 @@ progressbar.__doc__ %= (tqdm.__doc__, tqdm.__init__.__doc__)
 
 class DaskProgressBar(Callback):
     def __init__(self, desc=""):
-        """A progress bar for Dask that uses tqdm as a backend.
+        """A progress bar for Dask that uses tqdm as a backend, support for descriptions.
 
         Parameters
         ----------
         desc : string
             description of computation that is performed
+
+        Notes
+        -----
+        The alternative, tqdm.dask.TqdmCallback, doesn't let HyperSpy's preferences influence
+        which progressbar style to use.
         """
         self.desc = desc
 

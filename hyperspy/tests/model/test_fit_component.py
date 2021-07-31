@@ -225,7 +225,7 @@ class TestStdWithMultipleFitters:
 
         self.g1, self.g2 = g1, g2
 
-    @pytest.mark.parametrize("optimizer", ['lm', 'linear'])
+    @pytest.mark.parametrize("optimizer", ['lm', 'lstsq', 'ridge_regression'])
     def test_fitters(self, optimizer):
         self.m.fit(optimizer=optimizer)
         np.testing.assert_almost_equal(self.g1.A.std, 0.29659216)
