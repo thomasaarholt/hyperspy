@@ -218,6 +218,7 @@ extend-ignore = ["E501"]
 "*" = [
     "hyperspy_extension.yaml",
     "misc/dask_widgets/*.html.j2",
+    "py.typed",
 ]
 
 [tool.setuptools.packages.find]
